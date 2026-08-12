@@ -686,7 +686,7 @@ Panel {
           Text {
             visible: !root.animationEnabled
             width: parent.width
-            text: "Please enable Animation to change color."
+            text: "Please enable animations first."
             color: root.urgent
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption
