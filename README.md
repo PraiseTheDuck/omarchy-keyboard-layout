@@ -1,7 +1,15 @@
 # Keyboard Layout Pulse
 
-A keyboard-layout picker for the Omarchy Quattro bar. The current layout
-pulses after a change.
+A compact keyboard-layout picker for the Omarchy Quattro bar. It shows the
+active XKB layout, opens a native layout menu, and can pulse after a layout
+change.
+
+## Requirements
+
+- Omarchy Quattro
+- Two or more keyboard layouts configured in `~/.config/hypr/input.lua`
+
+No additional packages or background services are required.
 
 ## Install
 
@@ -10,41 +18,46 @@ omarchy plugin add \
   https://github.com/ilyaZar/omarchy-keyboard-layout.git --enable
 ```
 
-The plugin declares that it is a replacement for Omarchy's built-in
-`omarchy.keyboard-layout` widget. Enabling it swaps the existing bar entry to
-this plugin while preserving that entry's position and settings. Disabling or
-removing the plugin restores the built-in widget in the same place.
+The plugin replaces Omarchy's built-in `omarchy.keyboard-layout` bar widget.
+Removing or disabling it restores the built-in widget in the same position.
 
-This only replaces the bar widget. It does not replace or rewrite your
-Hyprland keyboard configuration. The available languages continue to come
-from `~/.config/hypr/input.lua`, and the plugin reads the effective list from
-Hyprland.
-
-## Use and customize
+## Use
 
 - Click the layout label to choose a configured language.
-- Scroll over the label to cycle languages.
-- Open **Settings** and choose **Custom** at the top of the color dropdown to
-  enter your own `#RRGGBB` pulse color. The fixed presets follow a separator.
-- The settings page shows the active layout shortcut in plain language. Use
-  its gear button to open the owning line in `~/.config/hypr/input.lua` with
-  `nvim`.
-- Select **Layouts/keybindings** to open Omarchy's Hyprland input file.
+- Scroll over the label to move to the next or previous language.
+- Open **Settings** from the language menu to customize the widget.
 
-The included colors are:
+## Animation and color
+
+Animation is enabled by default. After a layout change, the label pulses using
+the selected color.
+
+Turn **Animation** off for an immediate, plain layout change with no pulse,
+scale effect, or accent color. The color controls become shaded and inactive;
+the selected color remains saved for the next time Animation is enabled.
+
+The color dropdown puts **Custom** first, followed by fixed presets:
 
 - Teal: `#2aa198`
 - Purple: `#a77bd8`
 - Blue: `#3b82f6`
 - Nord yellow: `#ebcb8b`
 
-Each preset row shows its color. Presets cannot be edited. The custom field
-accepts exactly six-digit hex colors such as `#2aa191`. Apply saves the custom
-color in `~/.config/omarchy/shell.json` and closes the menu.
+Custom accepts exactly six-digit hex colors such as `#2aa191`. **Apply** saves
+the color and closes the menu.
 
-The shortcut display reads Hyprland's effective XKB `grp:*` option. Its label
-comes from the installed XKB rules and uses friendly names such as `Super`
-instead of `Win`. The plugin does not change or rewrite `input.lua`.
+## Layouts and keybindings
+
+The plugin reads the effective layouts and `grp:*` switching option directly
+from Hyprland. It translates XKB descriptions into friendly names such as
+**Both Alt keys** and **Super + Space**.
+
+Use the gear beside the displayed shortcut to open its owning line in
+`~/.config/hypr/input.lua` with `nvim`. Use **Layouts/keybindings** to open the
+whole input file.
+
+The plugin never rewrites the Hyprland input file. Layout and keybinding
+changes remain owned by Omarchy and Hyprland.
 
 ## Remove
 

@@ -23,6 +23,9 @@ Panel {
     Quickshell.env("HOME") + "/.config/hypr/input.lua"
   readonly property string pulseColor: normalizedPulseColor(
     setting("pulseColor", tealColor))
+  readonly property bool animationEnabled:
+    setting("animation", true) !== false
+  readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string shortcutDescription:
     describeGroupOption(groupOptionFrom(effectiveKeyboardOptions))
   property bool settingsPage: false
@@ -118,6 +121,17 @@ Panel {
     if (!isPulseColor(value)) return
     setPulseColor(value)
     root.close()
+  }
+
+  function resetPulse() {
+    pulseAnimation.stop()
+    root.pulseOpacity = 1
+    root.pulseScale = 1
+  }
+
+  function setAnimationEnabled(enabled) {
+    persistSettings({ animation: enabled })
+    if (!enabled) resetPulse()
   }
 
   function selectPresetColor(value) {
@@ -252,7 +266,7 @@ Panel {
     root.layouts = nextLayouts
     root.layoutLabel = nextLabel
     root.multipleLayouts = nextLayouts.length > 1
-    if (changed) pulseAnimation.restart()
+    if (changed && root.animationEnabled) pulseAnimation.restart()
   }
 
   function refresh() {
@@ -304,6 +318,8 @@ Panel {
     root.cursorActive = false
     root.refresh()
   }
+
+  onAnimationEnabledChanged: if (!animationEnabled) resetPulse()
 
   Component.onCompleted: refresh()
 
@@ -448,15 +464,17 @@ Panel {
     id: pulseLabel
     anchors.centerIn: button
     text: root.layoutLabel
-    color: pulseAnimation.running ? root.pulseColor : button.foreground
+    color: root.animationEnabled && pulseAnimation.running
+      ? root.pulseColor
+      : button.foreground
     opacity: root.pulseOpacity
     scale: root.pulseScale
     transformOrigin: Item.Center
     font.family: button.fontFamily
     font.pixelSize: Style.font.caption
-    font.bold: pulseAnimation.running
+    font.bold: root.animationEnabled && pulseAnimation.running
     renderType: Text.NativeRendering
-    layer.enabled: pulseAnimation.running
+    layer.enabled: root.animationEnabled && pulseAnimation.running
     layer.smooth: true
 
     Behavior on color {
@@ -554,15 +572,63 @@ Panel {
           width: parent.width
           spacing: Style.space(8)
 
-          PanelSectionHeader {
-            text: "Pulse color"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(
+              pulseColorHeader.implicitHeight,
+              animationToggleRow.implicitHeight)
+
+            PanelSectionHeader {
+              id: pulseColorHeader
+              text: "Pulse color"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Row {
+              id: animationToggleRow
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(5)
+
+              PanelSectionHeader {
+                id: animationToggleLabel
+                text: "Animation"
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              ToggleSwitch {
+                id: animationToggle
+                anchors.verticalCenter: animationToggleLabel.verticalCenter
+                anchors.verticalCenterOffset: Math.round(
+                  animationToggleLabel.topPadding / 2)
+                trackHeight: Math.round(
+                  animationToggleLabel.font.pixelSize * 1.2)
+                cursorPad: Style.space(3)
+                checked: root.animationEnabled
+                foreground: root.bar.foreground
+                onToggled: root.setAnimationEnabled(!checked)
+
+                PanelToolTip {
+                  visible: animationToggle.containsMouse
+                  text: root.animationEnabled
+                    ? "Disable the layout-change animation"
+                    : "Enable the layout-change animation"
+                  fontFamily: root.bar.fontFamily
+                }
+              }
+            }
           }
 
           ColorDropdown {
             id: colorDropdown
             width: parent.width
+            enabled: root.animationEnabled
+            opacity: root.animationEnabled ? 1 : 0.35
             value: root.customColorEditorVisible
               ? "custom"
               : root.presetForColor(root.pulseColor)
@@ -582,6 +648,8 @@ Panel {
             visible: root.customColorEditorVisible
             width: parent.width
             spacing: Style.space(6)
+            enabled: root.animationEnabled
+            opacity: root.animationEnabled ? 1 : 0.35
 
             TextField {
               id: customColorField
@@ -610,12 +678,23 @@ Panel {
           }
 
           Text {
-            visible: root.customColorEditorVisible
+            visible: root.animationEnabled
+              && root.customColorEditorVisible
               && customColorField.text !== ""
               && !customColorField.acceptableInput
             width: parent.width
             text: "Use #RRGGBB, for example #2aa198."
             color: Qt.darker(root.bar.foreground, 1.4)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+
+          Text {
+            visible: !root.animationEnabled
+            width: parent.width
+            text: "Please enable Animation to change color."
+            color: root.urgent
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap

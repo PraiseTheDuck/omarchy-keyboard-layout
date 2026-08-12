@@ -19,9 +19,17 @@
     "allowMultiple": false,
     "defaultSection": "center",
     "defaults": {
+      "animation": true,
       "pulseColor": "#2aa198"
     },
     "schema": [
+      {
+        "key": "animation",
+        "type": "boolean",
+        "label": "Animation",
+        "defaultValue": true,
+        "description": "Animate and color the layout label after a change."
+      },
       {
         "key": "pulseColor",
         "type": "string",
