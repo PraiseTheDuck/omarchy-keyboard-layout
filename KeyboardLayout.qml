@@ -696,7 +696,7 @@ Panel {
           PanelSeparator { foreground: root.bar.foreground }
 
           PanelSectionHeader {
-            text: "Settings: layouts and keybinding shortcut"
+            text: "Keyboard layouts & shortcut"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
           }
