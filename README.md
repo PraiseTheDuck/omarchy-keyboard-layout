@@ -1,12 +1,14 @@
 # Keyboard Layout Pulse
 
+![Keyboard layout menu and settings](preview.png)
+
 A compact keyboard-layout picker for the Omarchy Quattro bar. It shows the
-active XKB layout, opens a native layout menu, and can pulse after a layout
-change.
+active XKB layout, opens a native layout menu, and optionally pulses after a
+layout change to improve visual confirmation of the layout change.
 
 ## Requirements
 
-- Omarchy Quattro
+- Omarchy Quattro: >= 4.0.0
 - Two or more keyboard layouts configured in `~/.config/hypr/input.lua`
 
 No additional packages or background services are required.
@@ -19,7 +21,8 @@ omarchy plugin add \
 ```
 
 The plugin replaces Omarchy's built-in `omarchy.keyboard-layout` bar widget.
-Removing or disabling it restores the built-in widget in the same position.
+Removing or disabling the plugin restores the built-in widget in the same
+position.
 
 ## Use
 
@@ -49,14 +52,14 @@ the color and closes the menu.
 ## Layouts and keybindings
 
 The plugin reads the effective layouts and `grp:*` switching option directly
-from Hyprland. It translates XKB descriptions into friendly names such as
-**Both Alt keys** and **Super + Space**.
+from Hyprland. It translates XKB descriptions into friendly names such as **Both
+Alt keys** and **Super + Space**.
 
 Use the gear beside the displayed shortcut to open its owning line in
 `~/.config/hypr/input.lua` with `nvim`.
 
-The plugin never rewrites the Hyprland input file. Layout and keybinding
-changes remain owned by Omarchy and Hyprland.
+The plugin never rewrites the Hyprland input file. Layout and keybinding changes
+remain owned by Omarchy and Hyprland.
 
 ## Remove
 
