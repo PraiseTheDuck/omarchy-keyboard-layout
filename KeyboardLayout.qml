@@ -65,6 +65,12 @@ Panel {
     customColorField.text = color
   }
 
+  function applyPulseColor(value) {
+    if (!isPulseColor(value)) return
+    setPulseColor(value)
+    root.close()
+  }
+
   function openSettings() {
     root.settingsPage = true
     customColorField.text = root.pulseColor
@@ -476,7 +482,7 @@ Panel {
               validator: RegularExpressionValidator {
                 regularExpression: /^#[0-9a-fA-F]{6}$/
               }
-              onAccepted: root.setPulseColor(text)
+              onAccepted: root.applyPulseColor(text)
               Keys.onEscapePressed: root.closeSettings()
             }
 
@@ -489,7 +495,7 @@ Panel {
               bordered: true
               focusable: true
               enabled: customColorField.acceptableInput
-              onClicked: root.setPulseColor(customColorField.text)
+              onClicked: root.applyPulseColor(customColorField.text)
             }
           }
 
