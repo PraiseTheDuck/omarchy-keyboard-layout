@@ -12,9 +12,24 @@ Panel {
   readonly property string tealColor: "#2aa198"
   readonly property string purpleColor: "#a77bd8"
   readonly property string blueColor: "#3b82f6"
+  readonly property string yellowColor: "#ebcb8b"
+  readonly property var colorPresets: [
+    { label: "Teal", value: tealColor },
+    { label: "Purple", value: purpleColor },
+    { label: "Blue", value: blueColor },
+    { label: "Yellow", value: yellowColor }
+  ]
+  readonly property string keyboardConfigPath:
+    Quickshell.env("HOME") + "/.config/hypr/input.lua"
   readonly property string pulseColor: normalizedPulseColor(
     setting("pulseColor", tealColor))
+  readonly property string shortcutDescription:
+    describeGroupOption(groupOptionFrom(effectiveKeyboardOptions))
   property bool settingsPage: false
+  property bool customColorEditorVisible: false
+  property string effectiveKeyboardOptions: ""
+  property string xkbOptionDescriptions: ""
+  property int keyboardOptionsLine: 1
 
   property string keyboardName: ""
   property var keyboardNames: []
@@ -42,8 +57,42 @@ Panel {
   function presetForColor(value) {
     var color = normalizedPulseColor(value)
     return color === tealColor || color === purpleColor || color === blueColor
+      || color === yellowColor
       ? color
       : "custom"
+  }
+
+  function groupOptionFrom(options) {
+    return String(options || "").split(",").map(function(option) {
+      return option.trim()
+    }).find(function(option) {
+      return option.startsWith("grp:")
+    }) || ""
+  }
+
+  function friendlyXkbDescription(value) {
+    return String(value || "")
+      .replace(/\bBoth Alts together\b/g, "Both Alt keys")
+      .replace(/\bBoth Ctrls together\b/g, "Both Ctrl keys")
+      .replace(/\bBoth Shifts together\b/g, "Both Shift keys")
+      .replace(/\bWin\b/g, "Super")
+      .replace(/\s*\+\s*/g, " + ")
+  }
+
+  function describeGroupOption(option) {
+    if (!option) return "Not configured"
+
+    var lines = root.xkbOptionDescriptions.split("\n")
+    for (var index = 0; index < lines.length; index++) {
+      var match = lines[index].match(/^\s*(grp:\S+)\s+(.+)$/)
+      if (match && match[1] === option)
+        return friendlyXkbDescription(match[2])
+    }
+
+    return option
+      .substring(4)
+      .replace(/_toggle(?:_bidir)?$/, "")
+      .replace(/_/g, " ")
   }
 
   function persistSettings(values) {
@@ -71,21 +120,74 @@ Panel {
     root.close()
   }
 
+  function selectPresetColor(value) {
+    root.customColorEditorVisible = false
+    setPulseColor(value)
+    keyCatcher.forceActiveFocus()
+  }
+
+  function openCustomColorEditor() {
+    root.customColorEditorVisible = true
+    customColorField.text = root.pulseColor
+    Qt.callLater(function() {
+      customColorField.selectAll()
+      customColorField.forceActiveFocus()
+    })
+  }
+
+  function updateKeyboardOptions(raw) {
+    try {
+      root.effectiveKeyboardOptions
+        = String(JSON.parse(raw || "{}").str || "")
+    } catch (error) {
+      root.effectiveKeyboardOptions = ""
+    }
+  }
+
+  function updateKeyboardConfig(raw) {
+    var lines = String(raw || "").split("\n")
+    var commentedLine = 1
+
+    for (var index = 0; index < lines.length; index++) {
+      if (/^\s*kb_options\s*=/.test(lines[index])) {
+        root.keyboardOptionsLine = index + 1
+        return
+      }
+      if (/kb_options\s*=/.test(lines[index])) commentedLine = index + 1
+    }
+
+    root.keyboardOptionsLine = commentedLine
+  }
+
   function openSettings() {
     root.settingsPage = true
     customColorField.text = root.pulseColor
+    root.customColorEditorVisible
+      = root.presetForColor(root.pulseColor) === "custom"
   }
 
   function closeSettings() {
     root.settingsPage = false
+    root.customColorEditorVisible = false
     keyCatcher.forceActiveFocus()
   }
 
   function editKeyboardLayouts() {
     if (!root.bar) return
-    var path = Quickshell.env("HOME") + "/.config/hypr/input.lua"
-    root.bar.run("omarchy-launch-config-editor " + Util.shellQuote(path))
+    root.bar.run("omarchy-launch-config-editor "
+      + Util.shellQuote(root.keyboardConfigPath))
     root.close()
+  }
+
+  function editKeyboardShortcut() {
+    root.close()
+    Quickshell.execDetached([
+      "omarchy-launch-terminal",
+      "nvim",
+      "+" + String(root.keyboardOptionsLine),
+      "+normal! zz",
+      root.keyboardConfigPath
+    ])
   }
 
   function typingKeyboards(keyboards) {
@@ -156,6 +258,7 @@ Panel {
   function refresh() {
     if (!queryProcess.running) queryProcess.running = true
     if (!layoutProcess.running) layoutProcess.running = true
+    if (!optionsProcess.running) optionsProcess.running = true
   }
 
   function switchLayouts(target) {
@@ -236,6 +339,29 @@ Panel {
         }
       }
     }
+  }
+
+  Process {
+    id: optionsProcess
+    command: ["hyprctl", "-j", "getoption", "input:kb_options"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.updateKeyboardOptions(text)
+    }
+  }
+
+  FileView {
+    path: "/usr/share/X11/xkb/rules/evdev.lst"
+    printErrors: false
+    onLoaded: root.xkbOptionDescriptions = text()
+  }
+
+  FileView {
+    path: root.keyboardConfigPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.updateKeyboardConfig(text())
+    onFileChanged: reload()
   }
 
   Timer {
@@ -353,7 +479,8 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.settingsPage
-        && (colorPreset.popupOpen || customColorField.activeFocus)
+        && root.customColorEditorVisible
+        && customColorField.activeFocus
       onMoveRequested: function(dx, dy) {
         if (!root.settingsPage) root.moveCursor(dy !== 0 ? dy : dx)
       }
@@ -432,30 +559,85 @@ Panel {
             fontFamily: root.bar.fontFamily
           }
 
-          Dropdown {
-            id: colorPreset
+          Column {
+            id: colorPresetColumn
             width: parent.width
-            label: "Preset"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            options: [
-              { value: root.tealColor, label: "Teal" },
-              { value: root.purpleColor, label: "Purple" },
-              { value: root.blueColor, label: "Blue" },
-              { value: "custom", label: "Custom" }
-            ]
-            value: root.presetForColor(root.pulseColor)
-            onChanged: function(value) {
-              if (value === "custom") {
-                customColorField.selectAll()
-                customColorField.forceActiveFocus()
-              } else {
-                root.setPulseColor(value)
+            spacing: Style.space(6)
+
+            Repeater {
+              model: root.colorPresets
+
+              Button {
+                id: presetButton
+                required property var modelData
+                width: colorPresetColumn.width
+                text: String(modelData.label)
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                fontSize: Style.font.bodySmall
+                leftAlign: true
+                rightPadding: horizontalPadding + Style.space(20)
+                bordered: true
+                focusable: true
+                selected: !root.customColorEditorVisible
+                  && root.pulseColor === String(modelData.value)
+                onClicked: root.selectPresetColor(String(modelData.value))
+
+                Rectangle {
+                  width: Style.space(12)
+                  height: width
+                  radius: width / 2
+                  anchors.right: parent.right
+                  anchors.rightMargin: presetButton.horizontalPadding
+                  anchors.verticalCenter: parent.verticalCenter
+                  color: String(presetButton.modelData.value)
+                  border.width: 1
+                  border.color: Qt.rgba(
+                    presetButton.foreground.r,
+                    presetButton.foreground.g,
+                    presetButton.foreground.b,
+                    0.35)
+                }
+              }
+            }
+
+            Button {
+              id: customColorButton
+              width: colorPresetColumn.width
+              text: "Custom"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              leftAlign: true
+              rightPadding: horizontalPadding + Style.space(20)
+              bordered: true
+              focusable: true
+              selected: root.customColorEditorVisible
+                || root.presetForColor(root.pulseColor) === "custom"
+              onClicked: root.openCustomColorEditor()
+
+              Rectangle {
+                width: Style.space(12)
+                height: width
+                radius: width / 2
+                anchors.right: parent.right
+                anchors.rightMargin: customColorButton.horizontalPadding
+                anchors.verticalCenter: parent.verticalCenter
+                color: root.isPulseColor(customColorField.text)
+                  ? root.normalizedPulseColor(customColorField.text)
+                  : root.pulseColor
+                border.width: 1
+                border.color: Qt.rgba(
+                  customColorButton.foreground.r,
+                  customColorButton.foreground.g,
+                  customColorButton.foreground.b,
+                  0.35)
               }
             }
           }
 
           Row {
+            visible: root.customColorEditorVisible
             width: parent.width
             spacing: Style.space(6)
 
@@ -486,7 +668,8 @@ Panel {
           }
 
           Text {
-            visible: customColorField.text !== ""
+            visible: root.customColorEditorVisible
+              && customColorField.text !== ""
               && !customColorField.acceptableInput
             width: parent.width
             text: "Use #RRGGBB, for example #2aa198."
@@ -494,6 +677,49 @@ Panel {
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
+
+          PanelSectionHeader {
+            text: "Layout shortcut"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(
+              shortcutText.implicitHeight,
+              editShortcutButton.implicitHeight)
+
+            Text {
+              id: shortcutText
+              anchors.left: parent.left
+              anchors.right: editShortcutButton.left
+              anchors.rightMargin: Style.space(6)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.shortcutDescription
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+            }
+
+            PanelActionButton {
+              id: editShortcutButton
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: "󰒓"
+              tooltipText: "Edit layout shortcut"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              size: Style.space(24)
+              bordered: true
+              focusable: true
+              onClicked: root.editKeyboardShortcut()
+            }
           }
 
           PanelSeparator { foreground: root.bar.foreground }
