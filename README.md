@@ -9,7 +9,7 @@ layout change to improve visual confirmation of the layout change.
 ## Requirements
 
 - Omarchy Quattro: >= 4.0.0
-- Two or more keyboard layouts configured in `~/.config/hypr/input.lua`
+- One or more keyboard layouts configured in `~/.config/hypr/input.lua`
 
 No additional packages or background services are required.
 
@@ -29,6 +29,7 @@ position.
 - Click the layout label to choose a configured language.
 - Scroll over the label to move to the next or previous language.
 - Open **Settings** from the language menu to customize the widget.
+- Enable **Show with one layout** to keep the widget visible with one layout.
 
 ## Animation and color
 

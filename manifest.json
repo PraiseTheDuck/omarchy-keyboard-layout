@@ -20,7 +20,8 @@
     "defaultSection": "center",
     "defaults": {
       "animation": true,
-      "pulseColor": "#2aa198"
+      "pulseColor": "#2aa198",
+      "showSingleLayout": false
     },
     "schema": [
       {
@@ -36,6 +37,13 @@
         "label": "Pulse color",
         "defaultValue": "#2aa198",
         "description": "Hex color used when the keyboard layout changes."
+      },
+      {
+        "key": "showSingleLayout",
+        "type": "boolean",
+        "label": "Show with one layout",
+        "defaultValue": false,
+        "description": "Keep the widget visible when one layout is configured."
       }
     ]
   },

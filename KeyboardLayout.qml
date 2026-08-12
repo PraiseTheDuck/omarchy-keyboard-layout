@@ -25,6 +25,8 @@ Panel {
     setting("pulseColor", tealColor))
   readonly property bool animationEnabled:
     setting("animation", true) !== false
+  readonly property bool showSingleLayout:
+    setting("showSingleLayout", false) === true
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string shortcutDescription:
     describeGroupOption(groupOptionFrom(effectiveKeyboardOptions))
@@ -132,6 +134,11 @@ Panel {
   function setAnimationEnabled(enabled) {
     persistSettings({ animation: enabled })
     if (!enabled) resetPulse()
+  }
+
+  function setShowSingleLayout(enabled) {
+    persistSettings({ showSingleLayout: enabled })
+    if (!enabled && !root.multipleLayouts) root.close()
   }
 
   function selectPresetColor(value) {
@@ -423,7 +430,7 @@ Panel {
     }
   }
 
-  visible: layoutLabel !== "" && multipleLayouts
+  visible: layoutLabel !== "" && (multipleLayouts || showSingleLayout)
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -733,6 +740,44 @@ Panel {
               bordered: true
               focusable: true
               onClicked: root.editKeyboardShortcut()
+            }
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(
+              singleLayoutHeader.implicitHeight,
+              singleLayoutToggle.implicitHeight)
+
+            PanelSectionHeader {
+              id: singleLayoutHeader
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Show with one layout"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            ToggleSwitch {
+              id: singleLayoutToggle
+              anchors.right: parent.right
+              anchors.verticalCenter: singleLayoutHeader.verticalCenter
+              anchors.verticalCenterOffset: Math.round(
+                singleLayoutHeader.topPadding / 2)
+              trackHeight: Math.round(
+                singleLayoutHeader.font.pixelSize * 1.2)
+              cursorPad: Style.space(3)
+              checked: root.showSingleLayout
+              foreground: root.bar.foreground
+              onToggled: root.setShowSingleLayout(!checked)
+
+              PanelToolTip {
+                visible: singleLayoutToggle.containsMouse
+                text: root.showSingleLayout
+                  ? "Hide when only one layout is configured"
+                  : "Keep visible when only one layout is configured"
+                fontFamily: root.bar.fontFamily
+              }
             }
           }
 
