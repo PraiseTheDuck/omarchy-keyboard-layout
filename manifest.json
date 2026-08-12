@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "ilyaZar",
   "license": "MIT",
-  "description": "Pulsing XKB layout indicator and native picker for Omarchy.",
+  "description": "Pulsing keyboard layout (XKB) indicator and native picker for Omarchy.",
   "kinds": [
     "bar-widget"
   ],
