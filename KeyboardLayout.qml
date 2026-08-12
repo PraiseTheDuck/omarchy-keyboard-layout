@@ -479,8 +479,9 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.settingsPage
-        && root.customColorEditorVisible
-        && customColorField.activeFocus
+        && (colorDropdown.popupOpen
+          || (root.customColorEditorVisible
+            && customColorField.activeFocus))
       onMoveRequested: function(dx, dy) {
         if (!root.settingsPage) root.moveCursor(dy !== 0 ? dy : dx)
       }
@@ -559,80 +560,21 @@ Panel {
             fontFamily: root.bar.fontFamily
           }
 
-          Column {
-            id: colorPresetColumn
+          ColorDropdown {
+            id: colorDropdown
             width: parent.width
-            spacing: Style.space(6)
-
-            Repeater {
-              model: root.colorPresets
-
-              Button {
-                id: presetButton
-                required property var modelData
-                width: colorPresetColumn.width
-                text: String(modelData.label)
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                fontSize: Style.font.bodySmall
-                leftAlign: true
-                rightPadding: horizontalPadding + Style.space(20)
-                bordered: true
-                focusable: true
-                selected: !root.customColorEditorVisible
-                  && root.pulseColor === String(modelData.value)
-                onClicked: root.selectPresetColor(String(modelData.value))
-
-                Rectangle {
-                  width: Style.space(12)
-                  height: width
-                  radius: width / 2
-                  anchors.right: parent.right
-                  anchors.rightMargin: presetButton.horizontalPadding
-                  anchors.verticalCenter: parent.verticalCenter
-                  color: String(presetButton.modelData.value)
-                  border.width: 1
-                  border.color: Qt.rgba(
-                    presetButton.foreground.r,
-                    presetButton.foreground.g,
-                    presetButton.foreground.b,
-                    0.35)
-                }
-              }
-            }
-
-            Button {
-              id: customColorButton
-              width: colorPresetColumn.width
-              text: "Custom"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              fontSize: Style.font.bodySmall
-              leftAlign: true
-              rightPadding: horizontalPadding + Style.space(20)
-              bordered: true
-              focusable: true
-              selected: root.customColorEditorVisible
-                || root.presetForColor(root.pulseColor) === "custom"
-              onClicked: root.openCustomColorEditor()
-
-              Rectangle {
-                width: Style.space(12)
-                height: width
-                radius: width / 2
-                anchors.right: parent.right
-                anchors.rightMargin: customColorButton.horizontalPadding
-                anchors.verticalCenter: parent.verticalCenter
-                color: root.isPulseColor(customColorField.text)
-                  ? root.normalizedPulseColor(customColorField.text)
-                  : root.pulseColor
-                border.width: 1
-                border.color: Qt.rgba(
-                  customColorButton.foreground.r,
-                  customColorButton.foreground.g,
-                  customColorButton.foreground.b,
-                  0.35)
-              }
+            value: root.customColorEditorVisible
+              ? "custom"
+              : root.presetForColor(root.pulseColor)
+            customColor: root.isPulseColor(customColorField.text)
+              ? root.normalizedPulseColor(customColorField.text)
+              : root.pulseColor
+            presets: root.colorPresets
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            onChanged: function(value) {
+              if (value === "custom") root.openCustomColorEditor()
+              else root.selectPresetColor(value)
             }
           }
 
@@ -724,40 +666,43 @@ Panel {
 
           PanelSeparator { foreground: root.bar.foreground }
 
-          Button {
+          Row {
             width: parent.width
-            text: "Edit keyboard layouts"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            fontSize: Style.font.bodySmall
-            leftAlign: true
-            bordered: true
-            focusable: true
-            onClicked: root.editKeyboardLayouts()
-          }
+            spacing: Style.space(6)
 
-          PanelSeparator { foreground: root.bar.foreground }
+            Button {
+              width: parent.width - backButton.width - parent.spacing
+              text: "Layouts/keybindings"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              leftAlign: true
+              bordered: true
+              focusable: true
+              onClicked: root.editKeyboardLayouts()
+            }
 
-          Button {
-            id: backButton
-            width: parent.width
-            text: "Back"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            fontSize: Style.font.bodySmall
-            leftAlign: true
-            bordered: true
-            focusable: true
-            onClicked: root.closeSettings()
+            Button {
+              id: backButton
+              width: Style.space(82)
+              text: "Back"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              leftAlign: true
+              bordered: true
+              focusable: true
+              onClicked: root.closeSettings()
 
-            Text {
-              anchors.right: parent.right
-              anchors.rightMargin: backButton.horizontalPadding
-              anchors.verticalCenter: parent.verticalCenter
-              text: "󰅁"
-              color: backButton.foreground
-              font.family: backButton.fontFamily
-              font.pixelSize: backButton.iconSize
+              Text {
+                anchors.right: parent.right
+                anchors.rightMargin: backButton.horizontalPadding
+                anchors.verticalCenter: parent.verticalCenter
+                text: "󰅁"
+                color: backButton.foreground
+                font.family: backButton.fontFamily
+                font.pixelSize: backButton.iconSize
+              }
             }
           }
         }

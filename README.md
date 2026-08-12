@@ -24,12 +24,12 @@ Hyprland.
 
 - Click the layout label to choose a configured language.
 - Scroll over the label to cycle languages.
-- Open **Settings** to choose a fixed color preset. Select **Custom** to enter
-  your own `#RRGGBB` pulse color.
+- Open **Settings** and choose **Custom** at the top of the color dropdown to
+  enter your own `#RRGGBB` pulse color. The fixed presets follow a separator.
 - The settings page shows the active layout shortcut in plain language. Use
   its gear button to open the owning line in `~/.config/hypr/input.lua` with
   `nvim`.
-- Select **Edit keyboard layouts** to open Omarchy's Hyprland input file.
+- Select **Layouts/keybindings** to open Omarchy's Hyprland input file.
 
 The included colors are:
 
