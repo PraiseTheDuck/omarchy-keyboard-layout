@@ -7,7 +7,14 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "omarchy.keyboard-layout"
+  moduleName: "io.github.ilyazar.keyboard-layout"
+
+  readonly property string tealColor: "#2aa198"
+  readonly property string purpleColor: "#a77bd8"
+  readonly property string blueColor: "#3b82f6"
+  readonly property string pulseColor: normalizedPulseColor(
+    setting("pulseColor", tealColor))
+  property bool settingsPage: false
 
   property string keyboardName: ""
   property var keyboardNames: []
@@ -22,6 +29,58 @@ Panel {
   property bool multipleLayouts: true
   property real pulseOpacity: 1
   property real pulseScale: 1
+
+  function isPulseColor(value) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim())
+  }
+
+  function normalizedPulseColor(value) {
+    var color = String(value || "").trim().toLowerCase()
+    return isPulseColor(color) ? color : tealColor
+  }
+
+  function presetForColor(value) {
+    var color = normalizedPulseColor(value)
+    return color === tealColor || color === purpleColor || color === blueColor
+      ? color
+      : "custom"
+  }
+
+  function persistSettings(values) {
+    var entry = { id: root.moduleName }
+    for (var existing in root.settings)
+      if (existing !== "id") entry[existing] = root.settings[existing]
+    for (var key in values) entry[key] = values[key]
+
+    root.settings = entry
+    if (root.bar && root.bar.shell
+        && typeof root.bar.shell.updateEntryInline === "function")
+      root.bar.shell.updateEntryInline(root.moduleName, entry)
+  }
+
+  function setPulseColor(value) {
+    if (!isPulseColor(value)) return
+    var color = normalizedPulseColor(value)
+    persistSettings({ pulseColor: color })
+    customColorField.text = color
+  }
+
+  function openSettings() {
+    root.settingsPage = true
+    customColorField.text = root.pulseColor
+  }
+
+  function closeSettings() {
+    root.settingsPage = false
+    keyCatcher.forceActiveFocus()
+  }
+
+  function editKeyboardLayouts() {
+    if (!root.bar) return
+    var path = Quickshell.env("HOME") + "/.config/hypr/input.lua"
+    root.bar.run("omarchy-launch-config-editor " + Util.shellQuote(path))
+    root.close()
+  }
 
   function typingKeyboards(keyboards) {
     var physical = keyboards.filter(function(keyboard) {
@@ -115,17 +174,23 @@ Panel {
   }
 
   function moveCursor(delta) {
-    if (root.layouts.length === 0) return
+    var itemCount = root.layouts.length + 1
     if (!root.cursorActive) {
       root.cursorActive = true
       return
     }
-    root.cursorIndex = (root.cursorIndex + delta + root.layouts.length)
-      % root.layouts.length
+    root.cursorIndex = (root.cursorIndex + delta + itemCount) % itemCount
+  }
+
+  function activateCursor() {
+    if (!root.cursorActive) return
+    if (root.cursorIndex === root.layouts.length) root.openSettings()
+    else root.selectLayout(root.cursorIndex)
   }
 
   onOpenedChanged: {
     if (!opened) return
+    root.settingsPage = false
     root.cursorIndex = root.activeLayoutIndex
     root.cursorActive = false
     root.refresh()
@@ -251,7 +316,7 @@ Panel {
     id: pulseLabel
     anchors.centerIn: button
     text: root.layoutLabel
-    color: pulseAnimation.running ? "#2aa198" : button.foreground
+    color: pulseAnimation.running ? root.pulseColor : button.foreground
     opacity: root.pulseOpacity
     scale: root.pulseScale
     transformOrigin: Item.Center
@@ -274,47 +339,183 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(180))
-    contentHeight: panel.fittedContentHeight(layoutColumn.implicitHeight)
+    contentWidth: panel.fittedContentWidth(Style.space(
+      root.settingsPage ? 260 : 180))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: root.settingsPage
+        && (colorPreset.popupOpen || customColorField.activeFocus)
       onMoveRequested: function(dx, dy) {
-        root.moveCursor(dy !== 0 ? dy : dx)
+        if (!root.settingsPage) root.moveCursor(dy !== 0 ? dy : dx)
       }
-      onActivateRequested: {
-        if (root.cursorActive) root.selectLayout(root.cursorIndex)
+      onActivateRequested: root.activateCursor()
+      onCloseRequested: {
+        if (root.settingsPage) root.closeSettings()
+        else root.close()
       }
-      onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
       Column {
-        id: layoutColumn
+        id: panelColumn
         width: parent.width
         spacing: Style.space(6)
 
-        Repeater {
-          model: root.layouts
+        Column {
+          id: layoutColumn
+          visible: !root.settingsPage
+          width: parent.width
+          spacing: Style.space(6)
+
+          Repeater {
+            model: root.layouts
+
+            Button {
+              required property var modelData
+              required property int index
+              width: layoutColumn.width
+              text: String(modelData).toUpperCase()
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              leftAlign: true
+              bordered: true
+              selected: root.activeLayoutIndex === index
+              hasCursor: root.cursorActive && root.cursorIndex === index
+              onClicked: root.selectLayout(index)
+              onHovered: function(hovered) {
+                if (!hovered) return
+                root.cursorActive = true
+                root.cursorIndex = index
+              }
+            }
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
 
           Button {
-            required property var modelData
-            required property int index
             width: layoutColumn.width
-            text: String(modelData).toUpperCase()
+            text: "Settings"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
             fontSize: Style.font.bodySmall
             leftAlign: true
             bordered: true
-            selected: root.activeLayoutIndex === index
-            hasCursor: root.cursorActive && root.cursorIndex === index
-            onClicked: root.selectLayout(index)
+            hasCursor: root.cursorActive
+              && root.cursorIndex === root.layouts.length
+            onClicked: root.openSettings()
             onHovered: function(hovered) {
               if (!hovered) return
               root.cursorActive = true
-              root.cursorIndex = index
+              root.cursorIndex = root.layouts.length
             }
+          }
+        }
+
+        Column {
+          id: settingsColumn
+          visible: root.settingsPage
+          width: parent.width
+          spacing: Style.space(8)
+
+          Button {
+            width: parent.width
+            text: "Back"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            fontSize: Style.font.bodySmall
+            leftAlign: true
+            bordered: true
+            focusable: true
+            onClicked: root.closeSettings()
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
+
+          PanelSectionHeader {
+            text: "Pulse color"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+          }
+
+          Dropdown {
+            id: colorPreset
+            width: parent.width
+            label: "Preset"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            options: [
+              { value: root.tealColor, label: "Teal" },
+              { value: root.purpleColor, label: "Purple" },
+              { value: root.blueColor, label: "Blue" },
+              { value: "custom", label: "Custom" }
+            ]
+            value: root.presetForColor(root.pulseColor)
+            onChanged: function(value) {
+              if (value === "custom") {
+                customColorField.selectAll()
+                customColorField.forceActiveFocus()
+              } else {
+                root.setPulseColor(value)
+              }
+            }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(6)
+
+            TextField {
+              id: customColorField
+              width: parent.width - applyColorButton.width - parent.spacing
+              placeholderText: "#RRGGBB"
+              foreground: root.bar.foreground
+              font.family: root.bar.fontFamily
+              validator: RegularExpressionValidator {
+                regularExpression: /^#[0-9a-fA-F]{6}$/
+              }
+              onAccepted: root.setPulseColor(text)
+              Keys.onEscapePressed: root.closeSettings()
+            }
+
+            Button {
+              id: applyColorButton
+              text: "Apply"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              bordered: true
+              focusable: true
+              enabled: customColorField.acceptableInput
+              onClicked: root.setPulseColor(customColorField.text)
+            }
+          }
+
+          Text {
+            visible: customColorField.text !== ""
+              && !customColorField.acceptableInput
+            width: parent.width
+            text: "Use #RRGGBB, for example #2aa198."
+            color: Qt.darker(root.bar.foreground, 1.4)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Button {
+            width: parent.width
+            text: "Edit keyboard layouts"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            fontSize: Style.font.bodySmall
+            leftAlign: true
+            bordered: true
+            focusable: true
+            onClicked: root.editKeyboardLayouts()
           }
         }
       }

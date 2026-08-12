@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.ilyazar.keyboard-layout",
   "name": "Keyboard Layout Pulse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "ilyaZar",
   "license": "MIT",
   "description": "Pulsing XKB layout indicator and native picker for Omarchy.",
@@ -17,7 +17,19 @@
     "description": "Show and select the current physical keyboard layout.",
     "category": "Compositor",
     "allowMultiple": false,
-    "defaultSection": "center"
+    "defaultSection": "center",
+    "defaults": {
+      "pulseColor": "#2aa198"
+    },
+    "schema": [
+      {
+        "key": "pulseColor",
+        "type": "string",
+        "label": "Pulse color",
+        "defaultValue": "#2aa198",
+        "description": "Hex color used when the keyboard layout changes."
+      }
+    ]
   },
   "omarchy": {
     "clonedFrom": "omarchy.keyboard-layout"

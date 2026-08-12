@@ -1,8 +1,11 @@
 # Keyboard Layout Pulse
 
 An Omarchy Quattro bar widget for switching between configured Hyprland XKB
-layouts. The current layout pulses in teal after a change. Press the widget to
-open a native Quattro picker, or use the mouse wheel to cycle layouts.
+layouts. The current layout pulses after a change. Press the widget to open a
+native Quattro picker, or use the mouse wheel to cycle layouts.
+
+The settings page offers teal (`#2aa198`), purple (`#a77bd8`), blue
+(`#3b82f6`), or any custom `#RRGGBB` pulse color.
 
 ## Requirements
 
