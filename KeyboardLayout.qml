@@ -186,13 +186,6 @@ Panel {
     keyCatcher.forceActiveFocus()
   }
 
-  function editKeyboardLayouts() {
-    if (!root.bar) return
-    root.bar.run("omarchy-launch-config-editor "
-      + Util.shellQuote(root.keyboardConfigPath))
-    root.close()
-  }
-
   function editKeyboardShortcut() {
     root.close()
     Quickshell.execDetached([
@@ -703,7 +696,7 @@ Panel {
           PanelSeparator { foreground: root.bar.foreground }
 
           PanelSectionHeader {
-            text: "Layout shortcut"
+            text: "Settings: layouts and keybinding shortcut"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
           }
@@ -732,7 +725,7 @@ Panel {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               iconText: "󰒓"
-              tooltipText: "Edit layout shortcut"
+              tooltipText: "Edit layouts and keybinding shortcut"
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
               fontSize: Style.font.bodySmall
@@ -745,43 +738,26 @@ Panel {
 
           PanelSeparator { foreground: root.bar.foreground }
 
-          Row {
-            width: parent.width
-            spacing: Style.space(6)
+          Button {
+            id: backButton
+            width: Style.space(82)
+            text: "Back"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            fontSize: Style.font.bodySmall
+            leftAlign: true
+            bordered: true
+            focusable: true
+            onClicked: root.closeSettings()
 
-            Button {
-              width: parent.width - backButton.width - parent.spacing
-              text: "Layouts/keybindings"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              fontSize: Style.font.bodySmall
-              leftAlign: true
-              bordered: true
-              focusable: true
-              onClicked: root.editKeyboardLayouts()
-            }
-
-            Button {
-              id: backButton
-              width: Style.space(82)
-              text: "Back"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              fontSize: Style.font.bodySmall
-              leftAlign: true
-              bordered: true
-              focusable: true
-              onClicked: root.closeSettings()
-
-              Text {
-                anchors.right: parent.right
-                anchors.rightMargin: backButton.horizontalPadding
-                anchors.verticalCenter: parent.verticalCenter
-                text: "󰅁"
-                color: backButton.foreground
-                font.family: backButton.fontFamily
-                font.pixelSize: backButton.iconSize
-              }
+            Text {
+              anchors.right: parent.right
+              anchors.rightMargin: backButton.horizontalPadding
+              anchors.verticalCenter: parent.verticalCenter
+              text: "󰅁"
+              color: backButton.foreground
+              font.family: backButton.fontFamily
+              font.pixelSize: backButton.iconSize
             }
           }
         }

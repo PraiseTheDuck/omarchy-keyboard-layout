@@ -53,8 +53,7 @@ from Hyprland. It translates XKB descriptions into friendly names such as
 **Both Alt keys** and **Super + Space**.
 
 Use the gear beside the displayed shortcut to open its owning line in
-`~/.config/hypr/input.lua` with `nvim`. Use **Layouts/keybindings** to open the
-whole input file.
+`~/.config/hypr/input.lua` with `nvim`.
 
 The plugin never rewrites the Hyprland input file. Layout and keybinding
 changes remain owned by Omarchy and Hyprland.
