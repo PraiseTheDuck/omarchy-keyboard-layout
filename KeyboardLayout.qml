@@ -426,20 +426,6 @@ Panel {
           width: parent.width
           spacing: Style.space(8)
 
-          Button {
-            width: parent.width
-            text: "Back"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            fontSize: Style.font.bodySmall
-            leftAlign: true
-            bordered: true
-            focusable: true
-            onClicked: root.closeSettings()
-          }
-
-          PanelSeparator { foreground: root.bar.foreground }
-
           PanelSectionHeader {
             text: "Pulse color"
             foreground: root.bar.foreground
@@ -522,6 +508,31 @@ Panel {
             bordered: true
             focusable: true
             onClicked: root.editKeyboardLayouts()
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Button {
+            id: backButton
+            width: parent.width
+            text: "Back"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            fontSize: Style.font.bodySmall
+            leftAlign: true
+            bordered: true
+            focusable: true
+            onClicked: root.closeSettings()
+
+            Text {
+              anchors.right: parent.right
+              anchors.rightMargin: backButton.horizontalPadding
+              anchors.verticalCenter: parent.verticalCenter
+              text: "󰅁"
+              color: backButton.foreground
+              font.family: backButton.fontFamily
+              font.pixelSize: backButton.iconSize
+            }
           }
         }
       }
