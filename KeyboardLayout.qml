@@ -11,6 +11,8 @@ Panel {
 
   property string keyboardName: ""
   property var keyboardNames: []
+  property var deviceLayouts: []
+  property var configuredLayouts: []
   property var layouts: []
   property int activeLayoutIndex: 0
   property int cursorIndex: 0
@@ -21,19 +23,27 @@ Panel {
   property real pulseOpacity: 1
   property real pulseScale: 1
 
-  function physicalKeyboards(keyboards) {
-    return keyboards.filter(function(keyboard) {
+  function typingKeyboards(keyboards) {
+    var physical = keyboards.filter(function(keyboard) {
       return !String(keyboard.name).startsWith("hl-virtual-keyboard")
     })
+    var typing = physical.filter(function(keyboard) {
+      var name = String(keyboard.name)
+      return !name.endsWith("-system-control")
+        && !name.endsWith("-consumer-control")
+        && name !== "video-bus"
+        && !name.startsWith("power-button")
+    })
+    return typing.length > 0 ? typing : physical
   }
 
   function selectKeyboard(keyboards) {
-    var physical = root.physicalKeyboards(keyboards)
-    return physical.find(function(keyboard) { return keyboard.main })
-      || physical.find(function(keyboard) {
+    var typing = root.typingKeyboards(keyboards)
+    return typing.find(function(keyboard) {
         return keyboard.name === root.keyboardName
       })
-      || physical[0]
+      || typing.find(function(keyboard) { return keyboard.main })
+      || typing[0]
   }
 
   function updateKeyboards(keyboards) {
@@ -42,18 +52,37 @@ Panel {
 
     var nextLayouts = String(keyboard.layout || "").split(",").filter(Boolean)
     var index = Number(keyboard.active_layout_index || 0)
-    var nextLabel = nextLayouts[index]
-      ? nextLayouts[index].toUpperCase()
-      : String(keyboard.active_keymap).split(/\s+/)[0].substring(0, 3).toUpperCase()
-    var changed = root.layoutLabel !== "" && root.layoutLabel !== nextLabel
 
     root.keyboardName = String(keyboard.name || "")
-    root.keyboardNames = root.physicalKeyboards(keyboards).map(function(item) {
+    root.keyboardNames = root.typingKeyboards(keyboards).map(function(item) {
       return String(item.name || "")
     }).filter(Boolean)
-    root.layouts = nextLayouts
+    root.deviceLayouts = nextLayouts
     root.activeLayoutIndex = index
     root.layoutFull = String(keyboard.active_keymap)
+    root.updateLayouts()
+  }
+
+  function updateConfiguredLayouts(raw) {
+    try {
+      var value = String(JSON.parse(raw || "{}").str || "")
+      root.configuredLayouts = value.split(",").filter(Boolean)
+    } catch (error) {
+      root.configuredLayouts = []
+    }
+    root.updateLayouts()
+  }
+
+  function updateLayouts() {
+    var nextLayouts = root.configuredLayouts.length > 0
+      ? root.configuredLayouts
+      : root.deviceLayouts
+    var nextLabel = nextLayouts[root.activeLayoutIndex]
+      ? String(nextLayouts[root.activeLayoutIndex]).toUpperCase()
+      : root.layoutFull.split(/\s+/)[0].substring(0, 3).toUpperCase()
+    var changed = root.layoutLabel !== "" && root.layoutLabel !== nextLabel
+
+    root.layouts = nextLayouts
     root.layoutLabel = nextLabel
     root.multipleLayouts = nextLayouts.length > 1
     if (changed) pulseAnimation.restart()
@@ -61,6 +90,7 @@ Panel {
 
   function refresh() {
     if (!queryProcess.running) queryProcess.running = true
+    if (!layoutProcess.running) layoutProcess.running = true
   }
 
   function switchLayouts(target) {
@@ -106,8 +136,19 @@ Panel {
   Connections {
     target: Hyprland
     function onRawEvent(event) {
-      if (event && String(event.name || "").indexOf("activelayout") !== -1)
+      if (!event) return
+      var name = String(event.name || "")
+      if (name.indexOf("activelayout") !== -1 || name === "configreloaded")
         root.refresh()
+    }
+  }
+
+  Process {
+    id: layoutProcess
+    command: ["hyprctl", "-j", "getoption", "input:kb_layout"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.updateConfiguredLayouts(text)
     }
   }
 
@@ -160,14 +201,14 @@ Panel {
           target: root
           property: "pulseScale"
           from: 1
-          to: 1.08
+          to: 1.16
           duration: 325
           easing.type: Easing.InOutSine
         }
         NumberAnimation {
           target: root
           property: "pulseScale"
-          from: 1.08
+          from: 1.16
           to: 1
           duration: 325
           easing.type: Easing.InOutSine
@@ -184,13 +225,10 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.layoutLabel
-    active: pulseAnimation.running
-    activeColor: "#2aa198"
-    opacity: root.pulseOpacity
-    scale: root.pulseScale
-    transformOrigin: Item.Center
-    fontSize: Style.font.caption
+    text: ""
+    hasVisualContent: root.layoutLabel !== ""
+    labelVisible: false
+    fixedWidth: Math.max(12, labelProbe.implicitWidth + Style.space(12))
     horizontalMargin: 6
     tooltipText: root.layoutFull
     onPressed: function(mouseButton) {
@@ -198,6 +236,34 @@ Panel {
     }
     onWheelMoved: function(delta) {
       root.cycle(delta > 0 ? "next" : "prev")
+    }
+  }
+
+  Text {
+    id: labelProbe
+    visible: false
+    text: root.layoutLabel
+    font.family: button.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  Text {
+    id: pulseLabel
+    anchors.centerIn: button
+    text: root.layoutLabel
+    color: pulseAnimation.running ? "#2aa198" : button.foreground
+    opacity: root.pulseOpacity
+    scale: root.pulseScale
+    transformOrigin: Item.Center
+    font.family: button.fontFamily
+    font.pixelSize: Style.font.caption
+    font.bold: pulseAnimation.running
+    renderType: Text.NativeRendering
+    layer.enabled: pulseAnimation.running
+    layer.smooth: true
+
+    Behavior on color {
+      ColorAnimation { duration: 160 }
     }
   }
 
