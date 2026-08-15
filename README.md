@@ -13,8 +13,8 @@ layout change to improve visual confirmation of the layout change.
 - `json-c` for optional per-window layouts, included with Omarchy
 - One or more keyboard layouts configured in `~/.config/hypr/input.lua`
 
-The optional per-window mode runs a bundled helper only while it is enabled.
-It does not install a system service.
+The optional per-window mode runs a bundled helper only while it is enabled. It
+does not install a system service.
 
 ## Install
 
@@ -33,6 +33,10 @@ position.
 - Scroll over the label to move to the next or previous language.
 - Open **Settings** from the language menu to customize the widget.
 - Enable **Show with one layout** to keep the widget visible with one layout.
+- Under settings, toggle on/off:
+  - animation (pulsing + colored indicator)
+  - show icon even for one layout enabled (never hide top level language icon)
+  - per-window layout tracing; each hyprland window keeps track of layout
 
 ## Demo
 
