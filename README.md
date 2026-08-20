@@ -20,7 +20,7 @@ does not install a system service.
 
 ```bash
 omarchy plugin add \
-  https://github.com/ilyaZar/omarchy-keyboard-layout.git --enable
+  https://github.com/PraiseTheDuck/omarchy-keyboard-layout.git --enable
 ```
 
 The plugin replaces Omarchy's built-in `omarchy.keyboard-layout` bar widget.
