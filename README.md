@@ -36,6 +36,9 @@ position.
   - animation (pulsing + colored indicator)
   - show icon even for one layout enabled (never hide top level language icon)
   - per-window layout tracing; each hyprland window keeps track of layout
+  - Latin in menu and terminal (requires per-window layouts); uses the first
+    layout while the Omarchy menu or a terminal is focused, without overwriting
+    the remembered layout of other windows
 
 ## Demo
 
@@ -80,6 +83,14 @@ Enable **Activate per-window layouts** to remember the active layout separately
 for each open window. Disabling it stops the bundled helper and returns to one
 layout shared across windows. Automatic restores do not trigger the pulse, so
 the animation continues to identify manual layout changes.
+
+**Latin in menu and terminal** is on by default once per-window layouts are
+enabled. It switches to the first configured layout (usually Latin, such as
+`us` or `it`) while the Omarchy menu or a terminal is focused, then restores
+the remembered layout of the window you return to. The forced Latin switch is
+not stored as that window's layout, so opening Super+Space over a Russian
+browser does not teach the browser Latin. Turn the option off in Settings if
+you want terminals to keep their own layouts.
 
 ## Remove
 

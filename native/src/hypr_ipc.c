@@ -124,6 +124,42 @@ int hypr_keyboard_is_typing(const char *name) {
          strncmp(name, "power-button", 12) != 0;
 }
 
+static int starts_with(const char *value, const char *prefix) {
+  return value != NULL && prefix != NULL &&
+         strncmp(value, prefix, strlen(prefix)) == 0;
+}
+
+int hypr_window_class_is_terminal(const char *class_name) {
+  static const char *prefixes[] = {
+      "Alacritty",
+      "kitty",
+      "com.mitchellh.ghostty",
+      "foot",
+      "org.codeberg.dnkl.foot",
+      "wezterm",
+      "org.omarchy.",
+      "TUI.",
+      NULL,
+  };
+  if (class_name == NULL || class_name[0] == '\0')
+    return 0;
+  for (size_t i = 0; prefixes[i] != NULL; i++) {
+    if (starts_with(class_name, prefixes[i]))
+      return 1;
+  }
+  return 0;
+}
+
+int hypr_tag_is_terminal(const char *tag) {
+  size_t length;
+  if (tag == NULL)
+    return 0;
+  length = strlen(tag);
+  while (length > 0 && tag[length - 1] == '*')
+    length--;
+  return length == 8 && strncmp(tag, "terminal", 8) == 0;
+}
+
 static int device_layout(json_object *root, const char *device, int *layout) {
   json_object *keyboards = keyboards_from(root);
   if (keyboards == NULL || device == NULL)
@@ -192,6 +228,42 @@ static int active_window(json_object *root, uint64_t *window) {
   return layout_memory_parse_window(json_object_get_string(address), window);
 }
 
+static int tags_contain_terminal(json_object *tags) {
+  size_t count;
+  if (tags == NULL || !json_object_is_type(tags, json_type_array))
+    return 0;
+  count = json_object_array_length(tags);
+  for (size_t i = 0; i < count; i++) {
+    json_object *tag = json_object_array_get_idx(tags, i);
+    if (json_object_is_type(tag, json_type_string) &&
+        hypr_tag_is_terminal(json_object_get_string(tag)))
+      return 1;
+  }
+  return 0;
+}
+
+static int window_is_terminal(json_object *root) {
+  json_object *class_value = NULL;
+  json_object *tags = NULL;
+  const char *class_name = NULL;
+  if (root == NULL || !json_object_is_type(root, json_type_object))
+    return 0;
+  if (json_object_object_get_ex(root, "class", &class_value) &&
+      json_object_is_type(class_value, json_type_string))
+    class_name = json_object_get_string(class_value);
+  if (hypr_window_class_is_terminal(class_name))
+    return 1;
+  if (json_object_object_get_ex(root, "tags", &tags))
+    return tags_contain_terminal(tags);
+  return 0;
+}
+
+static int window_info(json_object *root, uint64_t *window, int *is_terminal) {
+  if (is_terminal)
+    *is_terminal = window_is_terminal(root);
+  return active_window(root, window);
+}
+
 int hypr_json_active_window(const char *json, uint64_t *window) {
   json_object *root = json_tokener_parse(json);
   int result = active_window(root, window);
@@ -199,9 +271,21 @@ int hypr_json_active_window(const char *json, uint64_t *window) {
   return result;
 }
 
+int hypr_json_window_is_terminal(const char *json) {
+  json_object *root = json_tokener_parse(json);
+  int result = window_is_terminal(root);
+  json_object_put(root);
+  return result;
+}
+
 int hypr_ipc_active_window(const struct hypr_ipc *ipc, uint64_t *window) {
+  return hypr_ipc_active_window_info(ipc, window, NULL);
+}
+
+int hypr_ipc_active_window_info(const struct hypr_ipc *ipc, uint64_t *window,
+                                int *is_terminal) {
   json_object *response = request_json(ipc, "j/activewindow");
-  int result = active_window(response, window);
+  int result = window_info(response, window, is_terminal);
   json_object_put(response);
   return result;
 }

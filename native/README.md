@@ -15,8 +15,12 @@ shell commands, and ad-hoc JSON parsing with:
 - unit-tested state transitions and response parsing.
 
 The plugin starts `keyboard-layoutd` only while **Activate per-window layouts**
-is enabled and stops it when the setting is disabled or the shell exits. Build
-and test it with:
+is enabled and stops it when the setting is disabled or the shell exits. With
+**Latin in menu and terminal** enabled, the helper is launched as
+`keyboard-layoutd --latin`: it forces layout 0 on Omarchy terminals, and the
+shell writes `latin-on` / `latin-off` to its stdin while the Omarchy menu is
+open so the overlay does not overwrite per-window memory. Build and test it
+with:
 
 ```bash
 make

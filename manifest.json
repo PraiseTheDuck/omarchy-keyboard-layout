@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.ilyazar.keyboard-layout",
   "name": "Keyboard Layout Pulse",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "ilyaZar",
   "license": "MIT",
-  "description": "Minimal keyboard layout (XKB) picker with a pulsing indicator and per-window layouts.",
+  "description": "Minimal keyboard layout (XKB) picker with a pulsing indicator, per-window layouts, and Latin in menu and terminal.",
   "kinds": [
     "bar-widget"
   ],

@@ -83,10 +83,52 @@ static void test_window_address_parser(void) {
   assert(layout_memory_parse_window("xyz", &window) == -1);
 }
 
+static void test_overlay_keeps_real_layout(void) {
+  struct layout_memory memory;
+  layout_memory_init(&memory, 0);
+  assert(layout_memory_reset(&memory, 0xa, 1) == 0);
+
+  int target = -1;
+  assert(layout_memory_overlay_enter(&memory, &target) == 1);
+  assert(target == 0);
+  assert(layout_memory_overlay_enter(&memory, &target) == 0);
+
+  assert(layout_memory_observe(&memory, 0) == 0);
+  assert(memory.active_layout == 1);
+
+  assert(layout_memory_overlay_leave(&memory, &target) == 1);
+  assert(target == 1);
+  assert(layout_memory_overlay_leave(&memory, &target) == 0);
+
+  assert(layout_memory_focus(&memory, 0xb, &target) == 0);
+  assert(layout_memory_assign(&memory, 0) == 0);
+  assert(layout_memory_focus(&memory, 0xa, &target) == 1);
+  assert(target == 1);
+
+  layout_memory_destroy(&memory);
+}
+
+static void test_overlay_reset_releases_hold(void) {
+  struct layout_memory memory;
+  layout_memory_init(&memory, 0);
+  assert(layout_memory_reset(&memory, 0xa, 1) == 0);
+
+  int target = -1;
+  assert(layout_memory_overlay_enter(&memory, &target) == 1);
+  assert(layout_memory_reset(&memory, 0xa, 1) == 0);
+  assert(memory.overlay_held == 0);
+  assert(layout_memory_observe(&memory, 2) == 0);
+  assert(memory.active_layout == 2);
+
+  layout_memory_destroy(&memory);
+}
+
 int main(void) {
   test_window_restore();
   test_unfocused_layout_is_not_attributed();
   test_close_and_reset_forget_saved_layouts();
   test_more_than_64_windows();
   test_window_address_parser();
+  test_overlay_keeps_real_layout();
+  test_overlay_reset_releases_hold();
 }

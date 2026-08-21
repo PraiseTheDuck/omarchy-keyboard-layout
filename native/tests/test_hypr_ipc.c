@@ -87,6 +87,33 @@ static void test_ipc_environment(void) {
   assert(hypr_ipc_init(&ipc, long_path, "signature") == -1);
 }
 
+static void test_terminal_class_and_tags(void) {
+  assert(hypr_window_class_is_terminal("foot"));
+  assert(hypr_window_class_is_terminal("org.omarchy.agent"));
+  assert(hypr_window_class_is_terminal("TUI.float"));
+  assert(hypr_window_class_is_terminal("kitty"));
+  assert(!hypr_window_class_is_terminal("firefox"));
+  assert(!hypr_window_class_is_terminal("brave-browser"));
+  assert(!hypr_window_class_is_terminal(""));
+  assert(!hypr_window_class_is_terminal(NULL));
+
+  assert(hypr_tag_is_terminal("terminal"));
+  assert(hypr_tag_is_terminal("terminal*"));
+  assert(!hypr_tag_is_terminal("default-opacity*"));
+  assert(!hypr_tag_is_terminal(NULL));
+
+  assert(hypr_json_window_is_terminal(
+      "{\"address\":\"0x1\",\"class\":\"org.omarchy.agent\","
+      "\"tags\":[\"default-opacity*\"]}"));
+  assert(hypr_json_window_is_terminal(
+      "{\"address\":\"0x1\",\"class\":\"firefox\","
+      "\"tags\":[\"default-opacity*\",\"terminal*\"]}"));
+  assert(!hypr_json_window_is_terminal(
+      "{\"address\":\"0x1\",\"class\":\"firefox\","
+      "\"tags\":[\"default-opacity*\"]}"));
+  assert(!hypr_json_window_is_terminal("{}"));
+}
+
 int main(void) {
   test_active_window();
   test_device_layout();
@@ -94,4 +121,5 @@ int main(void) {
   test_typing_keyboard_filter();
   test_invalid_json();
   test_ipc_environment();
+  test_terminal_class_and_tags();
 }

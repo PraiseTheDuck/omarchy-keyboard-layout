@@ -16,13 +16,19 @@ struct layout_memory {
   uint64_t focused_window;
   int active_layout;
   int default_layout;
+  int overlay_held;
 };
 
 void layout_memory_init(struct layout_memory *memory, int default_layout);
 void layout_memory_destroy(struct layout_memory *memory);
 int layout_memory_reset(struct layout_memory *memory, uint64_t focused_window,
                         int active_layout);
+int layout_memory_assign(struct layout_memory *memory, int layout);
 int layout_memory_observe(struct layout_memory *memory, int layout);
+int layout_memory_overlay_enter(struct layout_memory *memory,
+                                int *target_layout);
+int layout_memory_overlay_leave(struct layout_memory *memory,
+                                int *target_layout);
 int layout_memory_focus(struct layout_memory *memory, uint64_t window,
                         int *target_layout);
 void layout_memory_close(struct layout_memory *memory, uint64_t window);

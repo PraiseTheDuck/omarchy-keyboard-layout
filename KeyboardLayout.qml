@@ -36,6 +36,8 @@ Panel {
     savedSetting("showSingleLayout", false) === true
   readonly property bool perWindowLayouts:
     savedSetting("perWindowLayouts", false) === true
+  readonly property bool latinInMenuAndTerminal:
+    savedSetting("latinInMenuAndTerminal", true) !== false
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   property bool settingsPage: false
   property bool customColorEditorVisible: false
@@ -133,8 +135,21 @@ Panel {
     syncLayoutTracker()
   }
 
+  function setLatinInMenuAndTerminal(enabled) {
+    persistSettings({ latinInMenuAndTerminal: enabled })
+    if (!root.perWindowLayouts) return
+    restartLayoutTracker()
+  }
+
+  function trackerCommand() {
+    var command = ["setpriv", "--pdeathsig", "TERM", root.trackerPath]
+    if (root.latinInMenuAndTerminal) command.push("--latin")
+    return command
+  }
+
   function syncLayoutTracker() {
     if (root.perWindowLayouts) {
+      layoutTracker.command = root.trackerCommand()
       if (!layoutTracker.running) layoutTracker.running = true
       return
     }
@@ -145,11 +160,44 @@ Panel {
     if (layoutTracker.running) layoutTracker.running = false
   }
 
+  function restartLayoutTracker() {
+    trackerRestartTimer.stop()
+    if (layoutTracker.running) layoutTracker.running = false
+    Qt.callLater(function() { root.syncLayoutTracker() })
+  }
+
   function expectAutomaticRestore(line) {
-    var match = String(line || "").trim().match(/^restore:([0-9]+)$/)
+    var text = String(line || "").trim()
+    if (text === "ready") {
+      root.syncLatinOverlay()
+      return
+    }
+    var match = text.match(/^restore:([0-9]+)$/)
     if (!match) return
     root.automaticRestoreLayout = Number(match[1])
     automaticRestoreTimer.restart()
+  }
+
+  readonly property string menuPluginId: {
+    var shell = root.bar && root.bar.shell
+    if (!shell || !shell.pluginRegistry) return "omarchy.menu"
+    return shell.pluginRegistry.resolveEnabledId("omarchy.menu") || "omarchy.menu"
+  }
+
+  readonly property bool menuOpen: {
+    var shell = root.bar && root.bar.shell
+    if (!shell) return false
+    var openIds = shell.openPanelIds
+    if (typeof shell.isPluginOpen === "function")
+      return shell.isPluginOpen(root.menuPluginId)
+    return !!(openIds && openIds[root.menuPluginId])
+  }
+
+  function syncLatinOverlay() {
+    if (!layoutTracker.running || !root.perWindowLayouts
+        || !root.latinInMenuAndTerminal)
+      return
+    layoutTracker.write(root.menuOpen ? "latin-on\n" : "latin-off\n")
   }
 
   function selectPresetColor(value) {
@@ -331,6 +379,7 @@ Panel {
 
   onAnimationEnabledChanged: if (!animationEnabled) resetPulse()
   onPerWindowLayoutsChanged: syncLayoutTracker()
+  onMenuOpenChanged: root.syncLatinOverlay()
 
   Component.onCompleted: {
     settingsFile.reload()
@@ -377,15 +426,12 @@ Panel {
 
   Process {
     id: layoutTracker
-    command: [
-      "setpriv",
-      "--pdeathsig",
-      "TERM",
-      root.trackerPath
-    ]
+    command: root.trackerCommand()
+    stdinEnabled: true
     stdout: SplitParser {
       onRead: function(line) { root.expectAutomaticRestore(line) }
     }
+    onStarted: root.syncLatinOverlay()
     onExited: {
       root.automaticRestoreLayout = -1
       if (root.perWindowLayouts) trackerRestartTimer.restart()
@@ -866,6 +912,51 @@ Panel {
                 text: root.perWindowLayouts
                   ? "Use one layout across all windows"
                   : "Remember the layout used in each window"
+                fontFamily: root.bar.fontFamily
+              }
+            }
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(
+              latinHeader.implicitHeight,
+              latinToggle.implicitHeight)
+            enabled: root.perWindowLayouts
+            opacity: root.perWindowLayouts ? 1 : 0.35
+
+            PanelSectionHeader {
+              id: latinHeader
+              anchors.left: parent.left
+              anchors.right: latinToggle.left
+              anchors.rightMargin: Style.space(6)
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Latin in menu and terminal"
+              elide: Text.ElideRight
+              foreground: root.perWindowLayouts && root.latinInMenuAndTerminal
+                ? root.bar.foreground
+                : Color.muted
+              fontFamily: root.bar.fontFamily
+            }
+
+            ToggleSwitch {
+              id: latinToggle
+              anchors.right: parent.right
+              anchors.verticalCenter: latinHeader.verticalCenter
+              anchors.verticalCenterOffset: Math.round(
+                latinHeader.topPadding / 2)
+              trackHeight: Math.round(
+                latinHeader.font.pixelSize * 1.2)
+              cursorPad: Style.space(3)
+              checked: root.latinInMenuAndTerminal
+              foreground: root.bar.foreground
+              onToggled: root.setLatinInMenuAndTerminal(!checked)
+
+              PanelToolTip {
+                visible: latinToggle.containsMouse
+                text: root.latinInMenuAndTerminal
+                  ? "Keep the current layout in the menu and terminals"
+                  : "Use the first layout in the menu and terminals"
                 fontFamily: root.bar.fontFamily
               }
             }

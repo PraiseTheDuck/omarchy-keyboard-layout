@@ -58,12 +58,13 @@ int layout_memory_reset(struct layout_memory *memory, uint64_t focused_window,
   memory->length = 0;
   memory->focused_window = focused_window;
   memory->active_layout = active_layout;
+  memory->overlay_held = 0;
   if (focused_window == 0 || active_layout < 0)
     return 0;
   return remember_layout(memory, focused_window, active_layout);
 }
 
-int layout_memory_observe(struct layout_memory *memory, int layout) {
+int layout_memory_assign(struct layout_memory *memory, int layout) {
   if (layout < 0)
     return -1;
 
@@ -71,6 +72,34 @@ int layout_memory_observe(struct layout_memory *memory, int layout) {
   if (memory->focused_window == 0)
     return 0;
   return remember_layout(memory, memory->focused_window, layout);
+}
+
+int layout_memory_observe(struct layout_memory *memory, int layout) {
+  if (memory->overlay_held)
+    return 0;
+  return layout_memory_assign(memory, layout);
+}
+
+int layout_memory_overlay_enter(struct layout_memory *memory,
+                                int *target_layout) {
+  if (memory->overlay_held)
+    return 0;
+  memory->overlay_held = 1;
+  if (memory->active_layout <= 0)
+    return 0;
+  *target_layout = 0;
+  return 1;
+}
+
+int layout_memory_overlay_leave(struct layout_memory *memory,
+                                int *target_layout) {
+  if (!memory->overlay_held)
+    return 0;
+  memory->overlay_held = 0;
+  if (memory->active_layout <= 0)
+    return 0;
+  *target_layout = memory->active_layout;
+  return 1;
 }
 
 int layout_memory_focus(struct layout_memory *memory, uint64_t window,
