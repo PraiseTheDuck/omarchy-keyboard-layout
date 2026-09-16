@@ -210,6 +210,16 @@ static void read_events(int socket_fd, struct app *app) {
 
     if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
       return;
+
+    // stdin is the control channel owned by the QML Process. Once it goes
+    // away there is nobody left to manage this helper; exiting also avoids a
+    // POLLHUP busy loop while preserving the parent-death safety net.
+    if (app->latin &&
+        (fds[1].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+      stop_requested = 1;
+      return;
+    }
+
     if (fds[0].revents & POLLIN) {
       ssize_t count = read(socket_fd, chunk, sizeof(chunk));
       if (count < 0 && errno == EINTR)
