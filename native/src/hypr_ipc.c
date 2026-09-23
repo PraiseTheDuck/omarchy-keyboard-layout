@@ -120,6 +120,8 @@ int hypr_keyboard_is_typing(const char *name) {
   return name != NULL && strstr(name, "virtual-keyboard") == NULL &&
          !ends_with(name, "-system-control") &&
          !ends_with(name, "-consumer-control") &&
+         !ends_with(name, "-extra-buttons") &&
+         !ends_with(name, "-wmi-hotkeys") &&
          strcmp(name, "video-bus") != 0 &&
          strncmp(name, "power-button", 12) != 0;
 }
@@ -158,6 +160,59 @@ int hypr_tag_is_terminal(const char *tag) {
   while (length > 0 && tag[length - 1] == '*')
     length--;
   return length == 8 && strncmp(tag, "terminal", 8) == 0;
+}
+
+int hypr_layer_is_latin_overlay(const char *namespace_name) {
+  return starts_with(namespace_name, "omarchy-menu") ||
+         starts_with(namespace_name, "omarchy-lock");
+}
+
+static int layers_latin_count(json_object *root) {
+  int total = 0;
+  if (root == NULL || !json_object_is_type(root, json_type_object))
+    return 0;
+
+  json_object_object_foreach(root, monitor_name, monitor) {
+    json_object *levels = NULL;
+    (void)monitor_name;
+    if (!json_object_is_type(monitor, json_type_object) ||
+        !json_object_object_get_ex(monitor, "levels", &levels) ||
+        !json_object_is_type(levels, json_type_object))
+      continue;
+    json_object_object_foreach(levels, level_name, surfaces) {
+      (void)level_name;
+      if (!json_object_is_type(surfaces, json_type_array))
+        continue;
+      size_t count = json_object_array_length(surfaces);
+      for (size_t i = 0; i < count; i++) {
+        json_object *surface = json_object_array_get_idx(surfaces, i);
+        json_object *namespace_value = NULL;
+        if (!json_object_is_type(surface, json_type_object) ||
+            !json_object_object_get_ex(surface, "namespace",
+                                       &namespace_value) ||
+            !json_object_is_type(namespace_value, json_type_string))
+          continue;
+        if (hypr_layer_is_latin_overlay(
+                json_object_get_string(namespace_value)))
+          total++;
+      }
+    }
+  }
+  return total;
+}
+
+int hypr_json_latin_overlay_count(const char *json) {
+  json_object *root = json_tokener_parse(json);
+  int count = layers_latin_count(root);
+  json_object_put(root);
+  return count;
+}
+
+int hypr_ipc_latin_overlay_count(const struct hypr_ipc *ipc) {
+  json_object *response = request_json(ipc, "j/layers");
+  int count = layers_latin_count(response);
+  json_object_put(response);
+  return count;
 }
 
 static int device_layout(json_object *root, const char *device, int *layout) {

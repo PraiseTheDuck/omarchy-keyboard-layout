@@ -82,9 +82,11 @@ int layout_memory_observe(struct layout_memory *memory, int layout) {
 
 int layout_memory_overlay_enter(struct layout_memory *memory,
                                 int *target_layout) {
-  if (memory->overlay_held)
+  if (memory->overlay_held < 0)
+    memory->overlay_held = 0;
+  memory->overlay_held++;
+  if (memory->overlay_held > 1)
     return 0;
-  memory->overlay_held = 1;
   if (memory->active_layout <= 0)
     return 0;
   *target_layout = 0;
@@ -93,9 +95,11 @@ int layout_memory_overlay_enter(struct layout_memory *memory,
 
 int layout_memory_overlay_leave(struct layout_memory *memory,
                                 int *target_layout) {
-  if (!memory->overlay_held)
+  if (memory->overlay_held <= 0)
     return 0;
-  memory->overlay_held = 0;
+  memory->overlay_held--;
+  if (memory->overlay_held > 0)
+    return 0;
   if (memory->active_layout <= 0)
     return 0;
   *target_layout = memory->active_layout;

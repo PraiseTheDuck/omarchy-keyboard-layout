@@ -22,9 +22,12 @@ int hypr_ipc_switch_layout(const struct hypr_ipc *ipc, int layout);
 int hypr_keyboard_is_typing(const char *device);
 int hypr_window_class_is_terminal(const char *class_name);
 int hypr_tag_is_terminal(const char *tag);
+int hypr_layer_is_latin_overlay(const char *namespace_name);
+int hypr_ipc_latin_overlay_count(const struct hypr_ipc *ipc);
 
 int hypr_json_active_window(const char *json, uint64_t *window);
 int hypr_json_window_is_terminal(const char *json);
+int hypr_json_latin_overlay_count(const char *json);
 int hypr_json_current_layout(const char *json, int *layout);
 int hypr_json_device_layout(const char *json, const char *device, int *layout);
 

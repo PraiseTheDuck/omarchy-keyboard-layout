@@ -96,6 +96,7 @@ static void test_overlay_keeps_real_layout(void) {
   assert(layout_memory_observe(&memory, 0) == 0);
   assert(memory.active_layout == 1);
 
+  assert(layout_memory_overlay_leave(&memory, &target) == 0);
   assert(layout_memory_overlay_leave(&memory, &target) == 1);
   assert(target == 1);
   assert(layout_memory_overlay_leave(&memory, &target) == 0);

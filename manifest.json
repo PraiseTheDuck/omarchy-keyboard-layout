@@ -5,12 +5,14 @@
   "version": "0.3.0",
   "author": "ilyaZar",
   "license": "MIT",
-  "description": "Minimal keyboard layout (XKB) picker with a pulsing indicator, per-window layouts, and Latin in menu and terminal.",
+  "description": "Minimal keyboard layout (XKB) picker with a pulsing indicator, per-window layouts, and Latin in launcher, lock, and terminal.",
   "kinds": [
-    "bar-widget"
+    "bar-widget",
+    "service"
   ],
   "entryPoints": {
-    "barWidget": "KeyboardLayout.qml"
+    "barWidget": "KeyboardLayout.qml",
+    "service": "Service.qml"
   },
   "barWidget": {
     "displayName": "Keyboard Layout Pulse",

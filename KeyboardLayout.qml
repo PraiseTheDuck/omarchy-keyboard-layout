@@ -24,10 +24,15 @@ Panel {
     Quickshell.env("HOME") + "/.config/hypr/input.lua"
   readonly property string pluginPath:
     Quickshell.env("HOME") + "/.config/omarchy/plugins/" + moduleName
-  readonly property string settingsPath:
+  readonly property string legacySettingsPath:
     pluginPath + "/.settings.json"
   readonly property string trackerPath:
     pluginPath + "/native/keyboard-layoutd"
+  readonly property var trackerService: {
+    var shell = root.bar && root.bar.shell
+    if (!shell || typeof shell.serviceFor !== "function") return null
+    return shell.serviceFor(root.moduleName)
+  }
   readonly property string pulseColor: normalizedPulseColor(
     savedSetting("pulseColor", tealColor))
   readonly property bool animationEnabled:
@@ -38,6 +43,12 @@ Panel {
     savedSetting("perWindowLayouts", false) === true
   readonly property bool latinInMenuAndTerminal:
     savedSetting("latinInMenuAndTerminal", true) !== false
+  readonly property bool trackerSupportKnown:
+    root.trackerService ? root.trackerService.supportKnown : true
+  readonly property bool trackerSupported:
+    root.trackerService ? root.trackerService.supported : true
+  readonly property bool perWindowLayoutsActive:
+    root.perWindowLayouts && root.trackerSupported
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   property bool settingsPage: false
   property bool customColorEditorVisible: false
@@ -57,21 +68,71 @@ Panel {
   property real pulseOpacity: 1
   property real pulseScale: 1
   property int automaticRestoreLayout: -1
-  property var savedSettings: ({})
+  property var legacySettings: null
+  property bool legacySettingsLoaded: false
+  property bool legacySettingsMigrated: false
 
   function savedSetting(name, fallback) {
-    var value = root.savedSettings[name]
-    return value === undefined || value === null ? fallback : value
+    if (root.settings && root.settings[name] !== undefined
+        && root.settings[name] !== null)
+      return root.settings[name]
+    if (root.legacySettings && root.legacySettings[name] !== undefined
+        && root.legacySettings[name] !== null)
+      return root.legacySettings[name]
+    return fallback
   }
 
-  function loadSettings(raw) {
+  function storeSettings(next) {
+    root.settings = next
+    if (!root.bar || !root.bar.shell
+        || typeof root.bar.shell.updateEntryInline !== "function") {
+      console.warn("Keyboard Layout Pulse: inline settings are unavailable")
+      return false
+    }
+    return root.bar.shell.updateEntryInline(root.moduleName, next)
+  }
+
+  function persistSettings(values) {
+    var next = {}
+    if (root.legacySettings) {
+      for (var legacy in root.legacySettings)
+        next[legacy] = root.legacySettings[legacy]
+    }
+    for (var existing in root.settings)
+      next[existing] = root.settings[existing]
+    for (var key in values) next[key] = values[key]
+    return root.storeSettings(next)
+  }
+
+  function loadLegacySettings(raw) {
     try {
       var value = JSON.parse(raw || "{}")
-      root.savedSettings = value && typeof value === "object"
-        && !Array.isArray(value) ? value : ({})
+      root.legacySettings = value && typeof value === "object"
+        && !Array.isArray(value) ? value : null
     } catch (error) {
-      root.savedSettings = ({})
+      root.legacySettings = null
     }
+    root.legacySettingsLoaded = true
+    Qt.callLater(root.migrateLegacySettings)
+  }
+
+  function migrateLegacySettings() {
+    if (root.legacySettingsMigrated || !root.legacySettingsLoaded
+        || !root.bar || !root.bar.shell
+        || typeof root.bar.shell.updateEntryInline !== "function")
+      return
+
+    root.legacySettingsMigrated = true
+    if (!root.legacySettings) return
+
+    var next = {}
+    for (var legacy in root.legacySettings)
+      next[legacy] = root.legacySettings[legacy]
+    for (var current in root.settings)
+      next[current] = root.settings[current]
+
+    if (JSON.stringify(next) !== JSON.stringify(root.settings))
+      root.storeSettings(next)
   }
 
   function isPulseColor(value) {
@@ -89,16 +150,6 @@ Panel {
       || color === yellowColor
       ? color
       : "custom"
-  }
-
-  function persistSettings(values) {
-    var next = {}
-    for (var existing in root.savedSettings)
-      next[existing] = root.savedSettings[existing]
-    for (var key in values) next[key] = values[key]
-
-    root.savedSettings = next
-    settingsFile.setText(JSON.stringify(next, null, 2) + "\n")
   }
 
   function setPulseColor(value) {
@@ -137,8 +188,8 @@ Panel {
 
   function setLatinInMenuAndTerminal(enabled) {
     persistSettings({ latinInMenuAndTerminal: enabled })
-    if (!root.perWindowLayouts) return
-    restartLayoutTracker()
+    root.syncLayoutTracker()
+    root.syncLatinOverlay()
   }
 
   function trackerCommand() {
@@ -147,17 +198,39 @@ Panel {
     return command
   }
 
+  function usingSharedTracker() {
+    return !!(root.trackerService
+      && typeof root.trackerService.setTrackingEnabled === "function")
+  }
+
+  function stopLocalTracker() {
+    trackerRestartTimer.stop()
+    if (layoutTracker.running) layoutTracker.running = false
+  }
+
   function syncLayoutTracker() {
+    if (root.usingSharedTracker()) {
+      root.stopLocalTracker()
+      root.trackerService.setTrackingEnabled(root.perWindowLayouts)
+      if (typeof root.trackerService.setLatinEnabled === "function")
+        root.trackerService.setLatinEnabled(
+          root.perWindowLayouts && root.latinInMenuAndTerminal)
+      if (!root.perWindowLayoutsActive) {
+        automaticRestoreTimer.stop()
+        root.automaticRestoreLayout = -1
+      }
+      return
+    }
+
     if (root.perWindowLayouts) {
       layoutTracker.command = root.trackerCommand()
       if (!layoutTracker.running) layoutTracker.running = true
       return
     }
 
-    trackerRestartTimer.stop()
     automaticRestoreTimer.stop()
     root.automaticRestoreLayout = -1
-    if (layoutTracker.running) layoutTracker.running = false
+    root.stopLocalTracker()
   }
 
   function restartLayoutTracker() {
@@ -178,26 +251,20 @@ Panel {
     automaticRestoreTimer.restart()
   }
 
-  readonly property string menuPluginId: {
-    var shell = root.bar && root.bar.shell
-    if (!shell || !shell.pluginRegistry) return "omarchy.menu"
-    return shell.pluginRegistry.resolveEnabledId("omarchy.menu") || "omarchy.menu"
-  }
-
-  readonly property bool menuOpen: {
-    var shell = root.bar && root.bar.shell
-    if (!shell) return false
-    var openIds = shell.openPanelIds
-    if (typeof shell.isPluginOpen === "function")
-      return shell.isPluginOpen(root.menuPluginId)
-    return !!(openIds && openIds[root.menuPluginId])
-  }
+  property bool sessionLocked: false
 
   function syncLatinOverlay() {
+    if (root.usingSharedTracker()
+        && typeof root.trackerService.setOverlayHeld === "function") {
+      root.trackerService.setOverlayHeld(
+        root.perWindowLayouts && root.latinInMenuAndTerminal
+          && root.sessionLocked)
+      return
+    }
     if (!layoutTracker.running || !root.perWindowLayouts
         || !root.latinInMenuAndTerminal)
       return
-    layoutTracker.write(root.menuOpen ? "latin-on\n" : "latin-off\n")
+    layoutTracker.write(root.sessionLocked ? "latin-on\n" : "latin-off\n")
   }
 
   function selectPresetColor(value) {
@@ -264,6 +331,8 @@ Panel {
         && !name.endsWith("-consumer-control")
         && name !== "video-bus"
         && !name.startsWith("power-button")
+        && !name.endsWith("-extra-buttons")
+        && !name.endsWith("-wmi-hotkeys")
     })
     return typing.length > 0 ? typing : physical
   }
@@ -379,10 +448,13 @@ Panel {
 
   onAnimationEnabledChanged: if (!animationEnabled) resetPulse()
   onPerWindowLayoutsChanged: syncLayoutTracker()
-  onMenuOpenChanged: root.syncLatinOverlay()
+  onTrackerServiceChanged: syncLayoutTracker()
+  onSessionLockedChanged: root.syncLatinOverlay()
+  onBarChanged: Qt.callLater(root.migrateLegacySettings)
+  onSettingsChanged: Qt.callLater(root.migrateLegacySettings)
 
   Component.onCompleted: {
-    settingsFile.reload()
+    legacySettingsFile.reload()
     refresh()
   }
 
@@ -395,8 +467,14 @@ Panel {
     function onRawEvent(event) {
       if (!event) return
       var name = String(event.name || "")
-      if (name.indexOf("activelayout") !== -1 || name === "configreloaded")
-        root.refresh()
+      if (name.indexOf("activelayout") !== -1) {
+        var device = String(event.data || "").split(",")[0]
+        if (device && !device.startsWith("hl-virtual-keyboard"))
+          root.keyboardName = device
+      } else if (name !== "configreloaded") {
+        return
+      }
+      root.refresh()
     }
   }
 
@@ -424,6 +502,16 @@ Panel {
     }
   }
 
+  Connections {
+    target: root.trackerService
+    ignoreUnknownSignals: true
+    function onRestoreRequested(layout) {
+      root.automaticRestoreLayout = Number(layout)
+      automaticRestoreTimer.restart()
+    }
+    function onTrackerReady() { root.syncLatinOverlay() }
+  }
+
   Process {
     id: layoutTracker
     command: root.trackerCommand()
@@ -434,19 +522,17 @@ Panel {
     onStarted: root.syncLatinOverlay()
     onExited: {
       root.automaticRestoreLayout = -1
-      if (root.perWindowLayouts) trackerRestartTimer.restart()
+      if (!root.usingSharedTracker() && root.perWindowLayouts)
+        trackerRestartTimer.restart()
     }
   }
 
   FileView {
-    id: settingsFile
-    path: root.settingsPath
-    watchChanges: true
-    atomicWrites: true
+    id: legacySettingsFile
+    path: root.legacySettingsPath
     printErrors: false
-    onLoaded: root.loadSettings(text())
-    onLoadFailed: root.loadSettings("")
-    onFileChanged: reload()
+    onLoaded: root.loadLegacySettings(text())
+    onLoadFailed: root.loadLegacySettings("")
   }
 
   FileView {
@@ -480,6 +566,27 @@ Panel {
     running: true
     repeat: true
     onTriggered: root.refresh()
+  }
+
+  Process {
+    id: lockQuery
+    command: ["omarchy-shell", "lock", "isLocked"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.sessionLocked = String(text || "").trim() === "true"
+      }
+    }
+  }
+
+  Timer {
+    interval: 400
+    running: root.perWindowLayoutsActive && root.latinInMenuAndTerminal
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: {
+      if (!lockQuery.running) lockQuery.running = true
+    }
   }
 
   SequentialAnimation {
@@ -879,6 +986,8 @@ Panel {
             implicitHeight: Math.max(
               perWindowHeader.implicitHeight,
               perWindowToggle.implicitHeight)
+            opacity: root.trackerSupportKnown && root.trackerSupported
+              ? 1 : 0.45
 
             PanelSectionHeader {
               id: perWindowHeader
@@ -888,7 +997,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               text: "Activate per-window layouts"
               elide: Text.ElideRight
-              foreground: root.perWindowLayouts
+              foreground: root.perWindowLayoutsActive
                 ? root.bar.foreground
                 : Color.muted
               fontFamily: root.bar.fontFamily
@@ -903,15 +1012,18 @@ Panel {
               trackHeight: Math.round(
                 perWindowHeader.font.pixelSize * 1.2)
               cursorPad: Style.space(3)
-              checked: root.perWindowLayouts
+              enabled: root.trackerSupportKnown && root.trackerSupported
+              checked: root.perWindowLayoutsActive
               foreground: root.bar.foreground
               onToggled: root.setPerWindowLayouts(!checked)
 
               PanelToolTip {
                 visible: perWindowToggle.containsMouse
-                text: root.perWindowLayouts
-                  ? "Use one layout across all windows"
-                  : "Remember the layout used in each window"
+                text: root.trackerSupported
+                  ? (root.perWindowLayoutsActive
+                    ? "Use one layout across all windows"
+                    : "Remember the layout used in each window")
+                  : "Per-window layouts require x86-64"
                 fontFamily: root.bar.fontFamily
               }
             }
@@ -922,8 +1034,8 @@ Panel {
             implicitHeight: Math.max(
               latinHeader.implicitHeight,
               latinToggle.implicitHeight)
-            enabled: root.perWindowLayouts
-            opacity: root.perWindowLayouts ? 1 : 0.35
+            enabled: root.perWindowLayoutsActive
+            opacity: root.perWindowLayoutsActive ? 1 : 0.35
 
             PanelSectionHeader {
               id: latinHeader
@@ -931,9 +1043,9 @@ Panel {
               anchors.right: latinToggle.left
               anchors.rightMargin: Style.space(6)
               anchors.verticalCenter: parent.verticalCenter
-              text: "Latin in menu and terminal"
+              text: "Latin in launcher, lock, and terminal"
               elide: Text.ElideRight
-              foreground: root.perWindowLayouts && root.latinInMenuAndTerminal
+              foreground: root.perWindowLayoutsActive && root.latinInMenuAndTerminal
                 ? root.bar.foreground
                 : Color.muted
               fontFamily: root.bar.fontFamily
@@ -955,8 +1067,8 @@ Panel {
               PanelToolTip {
                 visible: latinToggle.containsMouse
                 text: root.latinInMenuAndTerminal
-                  ? "Keep the current layout in the menu and terminals"
-                  : "Use the first layout in the menu and terminals"
+                  ? "Keep the current layout in the launcher, lock screen, and terminals"
+                  : "Use the first layout in the launcher, lock screen, and terminals"
                 fontFamily: root.bar.fontFamily
               }
             }

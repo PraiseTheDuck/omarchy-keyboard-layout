@@ -18,6 +18,7 @@ struct app {
   struct hypr_ipc ipc;
   struct layout_memory memory;
   int latin;
+  int terminal_focused;
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -44,9 +45,51 @@ static int switch_to(struct app *app, int layout, int assign) {
 static int focused_is_terminal(struct app *app) {
   uint64_t window = 0;
   int is_terminal = 0;
+  if (app->terminal_focused)
+    return 1;
   if (hypr_ipc_active_window_info(&app->ipc, &window, &is_terminal) != 0)
     return 0;
   return is_terminal;
+}
+
+static void force_terminal_latin(struct app *app) {
+  if (app->memory.overlay_held)
+    return;
+  if (app->memory.active_layout != 0)
+    switch_to(app, 0, 1);
+}
+
+static void overlay_enter(struct app *app) {
+  int target = -1;
+  if (layout_memory_overlay_enter(&app->memory, &target) > 0)
+    switch_to(app, target, 0);
+}
+
+static void overlay_leave(struct app *app) {
+  int target = -1;
+  int result = layout_memory_overlay_leave(&app->memory, &target);
+  if (app->latin && focused_is_terminal(app)) {
+    force_terminal_latin(app);
+    return;
+  }
+  if (result > 0)
+    switch_to(app, target, 0);
+}
+
+static void note_active_class(struct app *app, const char *data) {
+  char class_name[256];
+  const char *comma;
+  size_t length;
+
+  if (data == NULL)
+    data = "";
+  comma = strchr(data, ',');
+  length = comma != NULL ? (size_t)(comma - data) : strlen(data);
+  if (length >= sizeof(class_name))
+    length = sizeof(class_name) - 1;
+  memcpy(class_name, data, length);
+  class_name[length] = '\0';
+  app->terminal_focused = hypr_window_class_is_terminal(class_name);
 }
 
 static void emit_ready(void) {
@@ -58,13 +101,20 @@ static void sync_state(struct app *app) {
   uint64_t window = 0;
   int is_terminal = 0;
   int layout = -1;
+  int overlays = 0;
   int have_window =
       hypr_ipc_active_window_info(&app->ipc, &window, &is_terminal) == 0;
   hypr_ipc_current_layout(&app->ipc, &layout);
   if (layout_memory_reset(&app->memory, have_window ? window : 0, layout) != 0)
     fprintf(stderr, "keyboard-layoutd: could not initialize memory\n");
-  if (app->latin && have_window && is_terminal && layout > 0)
-    switch_to(app, 0, 1);
+  app->terminal_focused = is_terminal;
+  if (app->latin) {
+    overlays = hypr_ipc_latin_overlay_count(&app->ipc);
+    for (int i = 0; i < overlays; i++)
+      overlay_enter(app);
+    if (have_window && is_terminal && app->memory.active_layout > 0)
+      force_terminal_latin(app);
+  }
   emit_ready();
 }
 
@@ -88,7 +138,7 @@ static void focus_window(struct app *app, const char *data) {
 
   if (app->latin && focused_is_terminal(app)) {
     if (app->memory.active_layout != 0 || result > 0)
-      switch_to(app, 0, 1);
+      force_terminal_latin(app);
     return;
   }
 
@@ -117,8 +167,19 @@ static void handle_event(struct app *app, char *line) {
   *separator = '\0';
   char *data = separator + 2;
 
-  if (strcmp(line, "activewindowv2") == 0) {
+  if (strcmp(line, "activewindow") == 0) {
+    int was_terminal = app->terminal_focused;
+    note_active_class(app, data);
+    if (app->latin && app->terminal_focused && !was_terminal)
+      force_terminal_latin(app);
+  } else if (strcmp(line, "activewindowv2") == 0) {
     focus_window(app, data);
+  } else if (strcmp(line, "openlayer") == 0) {
+    if (app->latin && hypr_layer_is_latin_overlay(data))
+      overlay_enter(app);
+  } else if (strcmp(line, "closelayer") == 0) {
+    if (app->latin && hypr_layer_is_latin_overlay(data))
+      overlay_leave(app);
   } else if (strcmp(line, "activelayout") == 0) {
     observe_layout(app, data);
   } else if (strcmp(line, "closewindow") == 0) {
@@ -131,29 +192,18 @@ static void handle_event(struct app *app, char *line) {
 }
 
 static void handle_command(struct app *app, const char *command) {
-  int target = -1;
-  int result;
   if (!app->latin || command == NULL || command[0] == '\0')
     return;
 
   if (strcmp(command, "latin-on") == 0) {
-    result = layout_memory_overlay_enter(&app->memory, &target);
-    if (result > 0)
-      switch_to(app, target, 0);
+    overlay_enter(app);
     return;
   }
 
   if (strcmp(command, "latin-off") != 0)
     return;
 
-  result = layout_memory_overlay_leave(&app->memory, &target);
-  if (app->latin && focused_is_terminal(app)) {
-    if (app->memory.active_layout != 0 || result > 0)
-      switch_to(app, 0, 1);
-    return;
-  }
-  if (result > 0)
-    switch_to(app, target, 0);
+  overlay_leave(app);
 }
 
 static int set_nonblock(int fd) {

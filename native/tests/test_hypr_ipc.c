@@ -48,11 +48,15 @@ static void test_current_layout_prefers_main_typing_keyboard(void) {
 
 static void test_typing_keyboard_filter(void) {
   assert(hypr_keyboard_is_typing("physical-keyboard"));
+  assert(hypr_keyboard_is_typing("xtrfy-xtrfy-wireless-receiver-keyboard"));
   assert(!hypr_keyboard_is_typing("hl-virtual-keyboard-ime"));
+  assert(!hypr_keyboard_is_typing("hl-virtual-keyboard-fcitx5"));
   assert(!hypr_keyboard_is_typing("keyboard-system-control"));
   assert(!hypr_keyboard_is_typing("keyboard-consumer-control"));
   assert(!hypr_keyboard_is_typing("video-bus"));
   assert(!hypr_keyboard_is_typing("power-button-1"));
+  assert(!hypr_keyboard_is_typing("asus-wmi-hotkeys"));
+  assert(!hypr_keyboard_is_typing("keyboard-extra-buttons"));
   assert(!hypr_keyboard_is_typing(NULL));
 }
 
@@ -92,6 +96,7 @@ static void test_terminal_class_and_tags(void) {
   assert(hypr_window_class_is_terminal("org.omarchy.agent"));
   assert(hypr_window_class_is_terminal("TUI.float"));
   assert(hypr_window_class_is_terminal("kitty"));
+  assert(hypr_window_class_is_terminal("com.mitchellh.ghostty"));
   assert(!hypr_window_class_is_terminal("firefox"));
   assert(!hypr_window_class_is_terminal("brave-browser"));
   assert(!hypr_window_class_is_terminal(""));
@@ -114,6 +119,25 @@ static void test_terminal_class_and_tags(void) {
   assert(!hypr_json_window_is_terminal("{}"));
 }
 
+static void test_latin_overlay_layers(void) {
+  assert(hypr_layer_is_latin_overlay("omarchy-menu"));
+  assert(hypr_layer_is_latin_overlay("omarchy-lock-preview"));
+  assert(!hypr_layer_is_latin_overlay("omarchy-bar"));
+  assert(!hypr_layer_is_latin_overlay("omarchy-background"));
+  assert(!hypr_layer_is_latin_overlay(NULL));
+
+  const char *layers =
+      "{\"eDP-1\":{\"levels\":{"
+      "\"0\":[{\"namespace\":\"omarchy-background\"}],"
+      "\"2\":[{\"namespace\":\"omarchy-bar\"}],"
+      "\"3\":[{\"namespace\":\"omarchy-menu\"},"
+      "{\"namespace\":\"omarchy-lock-preview\"}]}}}";
+  assert(hypr_json_latin_overlay_count(layers) == 2);
+  assert(hypr_json_latin_overlay_count("{\"eDP-1\":{\"levels\":{\"2\":[]}}}") ==
+         0);
+  assert(hypr_json_latin_overlay_count("{}") == 0);
+}
+
 int main(void) {
   test_active_window();
   test_device_layout();
@@ -122,4 +146,5 @@ int main(void) {
   test_invalid_json();
   test_ipc_environment();
   test_terminal_class_and_tags();
+  test_latin_overlay_layers();
 }
