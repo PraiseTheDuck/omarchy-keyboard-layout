@@ -168,10 +168,10 @@ static void handle_event(struct app *app, char *line) {
   char *data = separator + 2;
 
   if (strcmp(line, "activewindow") == 0) {
-    int was_terminal = app->terminal_focused;
+    // Hyprland emits the class event before activewindowv2. Switching here
+    // would store Latin on the window that still has focus, before its layout
+    // is saved. focus_window() applies the terminal override after that save.
     note_active_class(app, data);
-    if (app->latin && app->terminal_focused && !was_terminal)
-      force_terminal_latin(app);
   } else if (strcmp(line, "activewindowv2") == 0) {
     focus_window(app, data);
   } else if (strcmp(line, "openlayer") == 0) {

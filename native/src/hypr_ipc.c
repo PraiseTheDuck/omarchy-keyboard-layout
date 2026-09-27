@@ -116,19 +116,20 @@ static int ends_with(const char *value, const char *suffix) {
          strcmp(value + value_length - suffix_length, suffix) == 0;
 }
 
+static int starts_with(const char *value, const char *prefix) {
+  return value != NULL && prefix != NULL &&
+         strncmp(value, prefix, strlen(prefix)) == 0;
+}
+
 int hypr_keyboard_is_typing(const char *name) {
   return name != NULL && strstr(name, "virtual-keyboard") == NULL &&
          !ends_with(name, "-system-control") &&
          !ends_with(name, "-consumer-control") &&
          !ends_with(name, "-extra-buttons") &&
          !ends_with(name, "-wmi-hotkeys") &&
-         strcmp(name, "video-bus") != 0 &&
-         strncmp(name, "power-button", 12) != 0;
-}
-
-static int starts_with(const char *value, const char *prefix) {
-  return value != NULL && prefix != NULL &&
-         strncmp(value, prefix, strlen(prefix)) == 0;
+         !starts_with(name, "video-bus") &&
+         !starts_with(name, "power-button") &&
+         !starts_with(name, "sleep-button");
 }
 
 int hypr_window_class_is_terminal(const char *class_name) {
@@ -363,11 +364,13 @@ int hypr_ipc_device_layout(const struct hypr_ipc *ipc, const char *device,
   return query_layout(ipc, device, layout);
 }
 
-int hypr_ipc_switch_layout(const struct hypr_ipc *ipc, int layout) {
-  char request[64];
-  int length = snprintf(request, sizeof(request),
-                        "/switchxkblayout all %d", layout);
-  if (layout < 0 || length < 0 || (size_t)length >= sizeof(request))
+static int switch_named_layout(const struct hypr_ipc *ipc, const char *device,
+                               int layout) {
+  char request[256];
+  int length = snprintf(request, sizeof(request), "/switchxkblayout %s %d",
+                        device, layout);
+  if (device == NULL || device[0] == '\0' || layout < 0 || length < 0 ||
+      (size_t)length >= sizeof(request))
     return -1;
 
   int fd = send_request(ipc, request);
@@ -380,4 +383,33 @@ int hypr_ipc_switch_layout(const struct hypr_ipc *ipc, int layout) {
   } while (count < 0 && errno == EINTR);
   close(fd);
   return count == 2 && memcmp(response, "ok", 2) == 0 ? 0 : -1;
+}
+
+int hypr_ipc_switch_layout(const struct hypr_ipc *ipc, int layout) {
+  json_object *response = request_json(ipc, "j/devices");
+  json_object *keyboards = keyboards_from(response);
+  int switched = 0;
+  int failed = 0;
+
+  if (keyboards != NULL) {
+    size_t count = json_object_array_length(keyboards);
+    for (size_t i = 0; i < count; i++) {
+      const char *name =
+          keyboard_name(json_object_array_get_idx(keyboards, i));
+      if (!hypr_keyboard_is_typing(name))
+        continue;
+      if (switch_named_layout(ipc, name, layout) != 0)
+        failed++;
+      else
+        switched++;
+    }
+  }
+  json_object_put(response);
+
+  // Junk receivers still show up as keyboards. Compiling a keymap for every
+  // one of them stalls the compositor, so only real typing devices are
+  // switched. Fall back to all devices when none can be identified.
+  if (switched == 0)
+    return switch_named_layout(ipc, "all", layout);
+  return failed == 0 ? 0 : -1;
 }

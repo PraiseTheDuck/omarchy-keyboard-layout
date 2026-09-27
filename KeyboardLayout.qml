@@ -33,6 +33,15 @@ Panel {
     if (!shell || typeof shell.serviceFor !== "function") return null
     return shell.serviceFor(root.moduleName)
   }
+  readonly property var lockService: {
+    var shell = root.bar && root.bar.shell
+    if (!shell || typeof shell.serviceFor !== "function") return null
+    var id = "omarchy.lock"
+    var registry = shell.pluginRegistry
+    if (registry && typeof registry.resolveEnabledId === "function")
+      id = registry.resolveEnabledId("omarchy.lock") || id
+    return shell.serviceFor(id)
+  }
   readonly property string pulseColor: normalizedPulseColor(
     savedSetting("pulseColor", tealColor))
   readonly property bool animationEnabled:
@@ -251,7 +260,7 @@ Panel {
     automaticRestoreTimer.restart()
   }
 
-  property bool sessionLocked: false
+  readonly property bool sessionLocked: !!(root.lockService && root.lockService.locked)
 
   function syncLatinOverlay() {
     if (root.usingSharedTracker()
@@ -329,8 +338,9 @@ Panel {
       var name = String(keyboard.name)
       return !name.endsWith("-system-control")
         && !name.endsWith("-consumer-control")
-        && name !== "video-bus"
+        && !name.startsWith("video-bus")
         && !name.startsWith("power-button")
+        && !name.startsWith("sleep-button")
         && !name.endsWith("-extra-buttons")
         && !name.endsWith("-wmi-hotkeys")
     })
@@ -566,27 +576,6 @@ Panel {
     running: true
     repeat: true
     onTriggered: root.refresh()
-  }
-
-  Process {
-    id: lockQuery
-    command: ["omarchy-shell", "lock", "isLocked"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        root.sessionLocked = String(text || "").trim() === "true"
-      }
-    }
-  }
-
-  Timer {
-    interval: 400
-    running: root.perWindowLayoutsActive && root.latinInMenuAndTerminal
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: {
-      if (!lockQuery.running) lockQuery.running = true
-    }
   }
 
   SequentialAnimation {

@@ -54,7 +54,9 @@ static void test_typing_keyboard_filter(void) {
   assert(!hypr_keyboard_is_typing("keyboard-system-control"));
   assert(!hypr_keyboard_is_typing("keyboard-consumer-control"));
   assert(!hypr_keyboard_is_typing("video-bus"));
+  assert(!hypr_keyboard_is_typing("video-bus-1"));
   assert(!hypr_keyboard_is_typing("power-button-1"));
+  assert(!hypr_keyboard_is_typing("sleep-button"));
   assert(!hypr_keyboard_is_typing("asus-wmi-hotkeys"));
   assert(!hypr_keyboard_is_typing("keyboard-extra-buttons"));
   assert(!hypr_keyboard_is_typing(NULL));
