@@ -92,6 +92,20 @@ forced Latin switch is not stored as that window's layout, so opening
 Super+Space over a Russian browser does not teach the browser Latin. Turn the
 option off in Settings if you want terminals to keep their own layouts.
 
+Omarchy runs fcitx5 so CapsLock compose works. A fresh profile is `keyboard-us`,
+and fcitx is allowed to replace Hyprland's XKB layout with that profile. If the
+bar follows `kb_layout` but typing stays on the fcitx layout, it can help to
+add this to `~/.config/fcitx5/conf/wayland.conf`:
+
+```
+Allow Overriding System XKB Settings=False
+```
+
+Restart fcitx afterwards (`systemctl --user restart omarchy-fcitx5.service`).
+Compose stays. fcitx documents the option for KDE and GNOME; on Hyprland it is
+still the switch that stops fcitx from writing `keyboard-us` back over the
+layouts in `~/.config/hypr/input.lua`. The plugin does not create this file.
+
 ## Remove
 
 ```bash
