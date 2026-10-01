@@ -331,12 +331,12 @@ Panel {
   }
 
   function typingKeyboards(keyboards) {
-    var physical = keyboards.filter(function(keyboard) {
-      return !String(keyboard.name).startsWith("hl-virtual-keyboard")
-    })
-    var typing = physical.filter(function(keyboard) {
+    var typing = keyboards.filter(function(keyboard) {
       var name = String(keyboard.name)
-      return !name.endsWith("-system-control")
+      // fcitx's virtual keyboard is the one clients and menus actually use.
+      if (name.startsWith("hl-virtual-keyboard")) return true
+      return name.indexOf("virtual-keyboard") === -1
+        && !name.endsWith("-system-control")
         && !name.endsWith("-consumer-control")
         && !name.startsWith("video-bus")
         && !name.startsWith("power-button")
@@ -344,7 +344,7 @@ Panel {
         && !name.endsWith("-extra-buttons")
         && !name.endsWith("-wmi-hotkeys")
     })
-    return typing.length > 0 ? typing : physical
+    return typing.length > 0 ? typing : keyboards
   }
 
   function selectKeyboard(keyboards) {
@@ -479,7 +479,7 @@ Panel {
       var name = String(event.name || "")
       if (name.indexOf("activelayout") !== -1) {
         var device = String(event.data || "").split(",")[0]
-        if (device && !device.startsWith("hl-virtual-keyboard"))
+        if (device)
           root.keyboardName = device
       } else if (name !== "configreloaded") {
         return

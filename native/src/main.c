@@ -151,6 +151,7 @@ static void observe_layout(struct app *app, char *data) {
   if (separator == NULL || separator == data)
     return;
   *separator = '\0';
+  // Includes hl-virtual-keyboard*: that is the fcitx device clients type on.
   if (!hypr_keyboard_is_typing(data))
     return;
 

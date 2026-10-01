@@ -122,7 +122,16 @@ static int starts_with(const char *value, const char *prefix) {
 }
 
 int hypr_keyboard_is_typing(const char *name) {
-  return name != NULL && strstr(name, "virtual-keyboard") == NULL &&
+  // fcitx publishes the seat layout on hl-virtual-keyboard* and marks it main.
+  // Clients and the Omarchy menu follow that device, so it has to be observed
+  // and switched with the physical keyboards. Other virtual keyboards, and the
+  // HID receivers that only echo the layout list, stay out: compiling a keymap
+  // for every one of them stalls the compositor.
+  if (name == NULL)
+    return 0;
+  if (starts_with(name, "hl-virtual-keyboard"))
+    return 1;
+  return strstr(name, "virtual-keyboard") == NULL &&
          !ends_with(name, "-system-control") &&
          !ends_with(name, "-consumer-control") &&
          !ends_with(name, "-extra-buttons") &&
@@ -407,8 +416,9 @@ int hypr_ipc_switch_layout(const struct hypr_ipc *ipc, int layout) {
   json_object_put(response);
 
   // Junk receivers still show up as keyboards. Compiling a keymap for every
-  // one of them stalls the compositor, so only real typing devices are
-  // switched. Fall back to all devices when none can be identified.
+  // one of them stalls the compositor, so only layout devices are switched:
+  // physical keyboards and hl-virtual-keyboard*. Fall back to all devices
+  // when none can be identified.
   if (switched == 0)
     return switch_named_layout(ipc, "all", layout);
   return failed == 0 ? 0 : -1;
